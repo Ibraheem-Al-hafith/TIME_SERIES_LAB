@@ -11,26 +11,22 @@ from typing import Any, Dict, List, Optional, Tuple
 import gradio as gr
 import pandas as pd
 
-# Import system frameworks and configurations
 from src.config import Config, DataConfig, ModelsConfig, VisualizationConfig
-from src.config import ModelsConfig  # Double check resolution paths
+from src.data import DataClass
 from src.diagnostics import (
     calculate_adf_stationarity,
     generate_decomposition_plot,
     generate_holt_winters_plot,
+    generate_sarima_sandbox_fit,
     generate_stateless_correlation_plots,
 )
 from src.metrics import ScoringConfig
 from src.models import DecomposeConfig, ExponentialConfig, SARIMAConfig
 from src.orchestrator import MODEL_REGISTRY, ExperimentOrchestrator
+from src.visualizer import Visualizer
 
-# Configure module-level logging
 logger = logging.getLogger(__name__)
 
-
-# =====================================================================
-# IN-SAMPLE EXPLORATION DATA BOUNDARY SLICERS
-# =====================================================================
 
 def extract_training_slice(file_path: str, target_col: str, index_col: str, split_size: float) -> pd.Series:
     """Safely extracts the training split to keep evaluation data isolated."""
@@ -44,25 +40,43 @@ def extract_training_slice(file_path: str, target_col: str, index_col: str, spli
     cutoff = len(target_series) - int(split_size)
     
     if cutoff <= 0:
-        raise ValueError(f"Split horizon size ({int(split_size)}) exceeds complete timeline scale dimensions ({len(target_series)}).")
+        raise ValueError(f"Split horizon size ({int(split_size)}) exceeds scale dimensions ({len(target_series)}).")
         
     return target_series.iloc[:cutoff]
 
 
 # =====================================================================
-# SANDBOX INTERACTION EVENT HANDLERS
+# EVENT HANDLERS FOR STREAM INGESTION & SANDBOX CONTROLS
 # =====================================================================
 
-def handle_sandbox_decomposition(file_obj: Any, target_col: str, index_col: str, split_size: float, model: str, period: float) -> str:
+def handle_data_ingestion_visuals(file_obj: Any, target_col: str, index_col: str, split_size: float) -> Tuple[Optional[str], Optional[str]]:
+    """Generates continuous layout line plots and envelope spread tracking configurations instantly."""
+    if file_obj is None or not target_col:
+        return None, None
+    try:
+        data_cfg = DataConfig(path=file_obj.name, split_size=int(split_size), index_col=index_col if index_col else None)
+        dataset = DataClass(config=data_cfg)
+        vis_cfg = VisualizationConfig(plot_path="plots/")
+        visualizer = Visualizer(dataset=dataset, config=vis_cfg)
+        
+        line_path = visualizer.plot_line_series(target_col=target_col)
+        envelope_path = visualizer.plot_envelope_components(target_col=target_col)
+        return line_path, envelope_path
+    except Exception as exc:
+        logger.error("Failed handling ingestion visual paths: %s", exc)
+        return None, None
+
+
+def handle_sandbox_decomposition(file_obj: Any, target_col: str, index_col: str, split_size: float, model: str, period: float) -> Tuple[str, pd.DataFrame]:
     """Processes in-sample time series structural decompositions."""
     if file_obj is None or not target_col:
-        return "plots/sandbox/decomposition_explorer.png"  # Returns default placeholder if clear data is unpopulated
+        return "plots/sandbox/decomposition_explorer.png", pd.DataFrame()
     try:
         train_series = extract_training_slice(file_obj.name, target_col, index_col, split_size)
         return generate_decomposition_plot(train_series, model, int(period))
     except Exception as exc:
         logger.error("Sandbox Decomposition failure: %s", exc)
-        return generate_decomposition_plot(pd.Series(dtype=float), model, int(period))
+        return "plots/sandbox/decomposition_explorer.png", pd.DataFrame([{"Error": str(exc)}])
 
 
 def handle_sandbox_holt_winters(file_obj: Any, target_col: str, index_col: str, split_size: float, trend: str, seasonal: str, period: float) -> Tuple[str, pd.DataFrame]:
@@ -77,53 +91,52 @@ def handle_sandbox_holt_winters(file_obj: Any, target_col: str, index_col: str, 
         return "plots/sandbox/holt_winters_explorer.png", pd.DataFrame([{"Error": str(exc)}])
 
 
-def handle_sarima_stationarity_change(
-    file_obj: Any, target_col: str, index_col: str, split_size: float, d: float, D: float, seasonal_period: float
-) -> Tuple[str, str]:
-    """Processes custom differencing and recalculates core statistical reports."""
+def handle_sandbox_sarima(
+    file_obj: Any, target_col: str, index_col: str, split_size: float, 
+    p: float, d: float, q: float, P: float, D: float, Q: float, seasonal_period: float
+) -> Tuple[str, pd.DataFrame, str, str]:
+    """Fits the full SARIMA configurations onto training boundaries and returns diagnostics."""
     if file_obj is None or not target_col:
-        return "### Configuration Required\nUpload data fields to display analytical validation parameters.", "plots/sandbox/sarima_correlation_diagnostics.png"
-
+        return (
+            "plots/sandbox/sarima_fit_explorer.png", pd.DataFrame(),
+            "### Configuration Required", "plots/sandbox/sarima_correlation_diagnostics.png"
+        )
     try:
-        # 1. Parse index constraints and slice up to training split parameters
         train_series = extract_training_slice(file_obj.name, target_col, index_col, split_size)
         
-        # 2. Execute regular differencing steps
+        # 1. Generate fit plot & training score tables
+        fit_plot, metrics_df = generate_sarima_sandbox_fit(
+            train_series, int(p), int(d), int(q), int(P), int(D), int(Q), int(seasonal_period)
+        )
+        
+        # 2. Perform transformations tracking statistics
         differenced_series = train_series.copy()
         if int(d) > 0:
             for _ in range(int(d)):
                 differenced_series = differenced_series.diff().dropna()
-                
-        # Execute seasonal differencing steps
         if int(D) > 0 and int(seasonal_period) > 0:
             for _ in range(int(D)):
                 differenced_series = differenced_series.diff(periods=int(seasonal_period)).dropna()
 
-        # 3. Calculate structured statistical metrics using our new engine
         adf_data = calculate_adf_stationarity(differenced_series)
-        
-        # 4. Generate localized presentation patterns via Markdown boundary rules
         ui_markdown = f"""
         ### Augmented Dickey-Fuller (ADF) Stationarity Audit Report
         * **Status Message**: {adf_data.message}
         * **Is Stationary?**: `{"TRUE" if adf_data.is_stationary else "FALSE"}`
         * **ADF Test Statistic Value**: `{adf_data.statistic:.4f}`
         * **p-Value Probability**: `{adf_data.p_value:.6f}`
-        * **Regression Lags Utilized**: `{adf_data.lags_used}`
-        * **Effective Data Coordinates Used**: `{adf_data.observations}`
-        
-        #### Mathematical Alpha Significance Thresholds:
         """
         for pct, val in adf_data.critical_values.items():
             ui_markdown += f"\n* **Critical Boundary ({pct})**: `{val:.4f}`"
             
-        # 5. Graph corresponding dependency structures
-        plot_path = generate_stateless_correlation_plots(differenced_series)
-        return ui_markdown, plot_path
-
+        corr_plot = generate_stateless_correlation_plots(differenced_series)
+        return fit_plot, metrics_df, ui_markdown, corr_plot
     except Exception as exc:
-        logger.error("Failure tracking sandbox transformation arrays: %s", exc)
-        return f"### Pipeline Computational Failure\nAn unexpected anomaly halted the diagnostic engine: {str(exc)}", "plots/sandbox/sarima_correlation_diagnostics.png"
+        logger.error("Sandbox SARIMA failure: %s", exc)
+        return (
+            "plots/sandbox/sarima_fit_explorer.png", pd.DataFrame([{"Error": str(exc)}]),
+            f"### Execution Failure\n{str(exc)}", "plots/sandbox/sarima_correlation_diagnostics.png"
+        )
 
 
 # =====================================================================
@@ -183,13 +196,31 @@ def execute_ui_pipeline(
         if model_choice == "Run All Models Sweep":
             run_output = orchestrator.run_all_models(target_column=target_col)
             metrics_df = extract_comparative_table(run_output)
-            comparison_plot = os.path.join(global_cfg.visualizer.plot_path, "model_comparison_overlay.png")
-            plot_to_render = comparison_plot if os.path.exists(comparison_plot) else None
+            
+            # Use unified visualizer engine to chart prediction overlays across sweeps
+            dataset_instance = DataClass(config=data_cfg)
+            vis_engine = Visualizer(dataset=dataset_instance, config=vis_cfg)
+            
+            # Locate an available execution layer to map reference overlays
+            plot_to_render = None
+            if "sarima" in run_output["results"]:
+                plot_to_render = vis_engine.plot_predictions_vs_actuals(
+                    predictions=run_output["results"]["sarima"]["predictions"], target_col=target_col
+                )
+            elif "exponential_smoothing" in run_output["results"]:
+                plot_to_render = vis_engine.plot_predictions_vs_actuals(
+                    predictions=run_output["results"]["exponential_smoothing"]["predictions"], target_col=target_col
+                )
             return metrics_df, plot_to_render, "Batch sequence evaluation sweep completed successfully."
         else:
             run_output = orchestrator.run_single_model(model_type=model_choice, target_column=target_col)
             metrics_df = pd.DataFrame([run_output["metrics"]], index=[model_choice.upper()])
-            plot_to_render = os.path.join(global_cfg.visualizer.plot_path, run_output["run_id"], "predictions_vs_actuals.png")
+            
+            dataset_instance = DataClass(config=data_cfg)
+            vis_engine = Visualizer(dataset=dataset_instance, config=vis_cfg)
+            plot_to_render = vis_engine.plot_predictions_vs_actuals(
+                predictions=run_output["predictions"], target_col=target_col
+            )
             return metrics_df, plot_to_render, f"Model run target '{model_choice}' successfully complete."
     except Exception as err:
         return pd.DataFrame(), None, f"Pipeline Run Failure: {str(err)}"
@@ -206,7 +237,7 @@ def build_gradio_interface() -> gr.Blocks:
     with gr.Blocks(title="Forecasting Infrastructure Management Console", theme=gr.themes.Default()) as app:
         gr.Markdown("# Automated Production Analytics & Discovery Engine Hub")
 
-        # SHARED TOP-LEVEL INGESTION BLOCK CONFIGURATION
+        # SHARED TOP-LEVEL INGESTION BLOCK CONFIGURATION WITH DYNAMIC STREAM VISUALIZERS
         with gr.Row():
             with gr.Column(scale=1):
                 gr.Markdown("### Core Data Stream Ingestion Controls")
@@ -215,11 +246,15 @@ def build_gradio_interface() -> gr.Blocks:
                     index_column = gr.Textbox(label="Calendar Index Column", value="Date")
                     target_column = gr.Dropdown(choices=[], label="Target Metric Column", interactive=True)
                 split_size = gr.Number(label="Out-of-Sample Validation Slice Size", value=12, precision=0)
-
-        # SEPARATION STRATEGY: DUAL PHASE PRIMARY TABS STRUCTURE
-        with gr.Tabs():
             
-            # PHASE 1: AUTOMATED BATCH DASHBOARD (PRODUCTION HORIZONS)
+            with gr.Column(scale=2):
+                gr.Markdown("### Ingestion Temporal Properties Visualization")
+                with gr.Row():
+                    ingestion_line_plot = gr.Image(label="Dataset Sequence Line Split Map", type="filepath")
+                    ingestion_envelope_plot = gr.Image(label="Envelope Geometry Analysis Map", type="filepath")
+
+        with gr.Tabs():
+            # PHASE 1: AUTOMATED BATCH DASHBOARD
             with gr.Tab("Automated Batch Dashboard"):
                 with gr.Row():
                     with gr.Column(scale=1):
@@ -256,7 +291,7 @@ def build_gradio_interface() -> gr.Blocks:
                         batch_metrics_table = gr.DataFrame(label="Out-of-Sample Score Parameters Report", interactive=False)
                         batch_plot_output = gr.Image(label="Validation Projection Visual Layouts", type="filepath")
 
-            # PHASE 2: EXPERIMENTAL EXPLORATION SANDBOX (IN-SAMPLE ANALYSIS ONLY)
+            # PHASE 2: EXPERIMENTAL EXPLORATION SANDBOX
             with gr.Tab("Hyperparameter Discovery Sandbox"):
                 gr.Markdown("### In-Sample Parameter Analysis Workspace (Isolates Test Partition Data)")
                 
@@ -265,11 +300,13 @@ def build_gradio_interface() -> gr.Blocks:
                     with gr.Tab("1. Time Series Decomposition"):
                         with gr.Row():
                             with gr.Column(scale=1):
+                                gr.Markdown("#### Classical Decomposition Controls")
                                 decomp_type = gr.Radio(choices=["additive", "multiplicative"], value="additive", label="Algebraic Composition Mode")
-                                decomp_period = gr.Number(label="Seasonal Decomposition Frequency Lag Bounds", value=12, precision=0)
-                                calculate_decomp_btn = gr.Button("Extract Trend Matrix Parts", variant="secondary")
+                                decomp_period = gr.Number(label="Seasonal Decomposition Periodicity Horizon", value=12, precision=0)
+                                calculate_decomp_btn = gr.Button("Fit In-Sample Decomposition Model", variant="secondary")
                             with gr.Column(scale=2):
-                                decomp_sandbox_image = gr.Image(label="Structural Systematic Components", type="filepath")
+                                decomp_sandbox_image = gr.Image(label="In-Sample Reconstructed Fit Path", type="filepath")
+                                decomp_sandbox_metrics = gr.DataFrame(label="Decomposition Metrics")
 
                     # SANDBOX PANEL 2: HOLT-WINTERS SMOOTHING PARAMETERS
                     with gr.Tab("2. Holt-Winters Smoothing"):
@@ -287,24 +324,37 @@ def build_gradio_interface() -> gr.Blocks:
                     with gr.Tab("3. Iterative SARIMA Discovery"):
                         with gr.Row():
                             with gr.Column(scale=1):
-                                gr.Markdown("#### Dynamic Transformations & Testing Metrics")
-                                d_slider = gr.Slider(0, 2, value=0, step=1, label="Regular Differencing Multi-Step Operator (d)")
-                                D_slider = gr.Slider(0, 2, value=0, step=1, label="Seasonal Differencing Multi-Step Operator (D)")
+                                gr.Markdown("#### Model Coefficients Tuning Grid")
+                                with gr.Row():
+                                    s_p = gr.Slider(0, 5, 1, step=1, label="p")
+                                    s_d = gr.Slider(0, 2, 0, step=1, label="d")
+                                    s_q = gr.Slider(0, 5, 1, step=1, label="q")
+                                with gr.Row():
+                                    s_P = gr.Slider(0, 3, 0, step=1, label="P")
+                                    s_D = gr.Slider(0, 2, 0, step=1, label="D")
+                                    s_Q = gr.Slider(0, 3, 0, step=1, label="Q")
                                 m_input = gr.Number(value=12, label="Seasonal Lag Period Configuration (m)", precision=0)
                                 
-                                adf_report_container = gr.Markdown("Modify differencing configurations to evaluate ADF statistics instantly.")
+                                calculate_sarima_btn = gr.Button("Fit Simulation SARIMA Model", variant="secondary")
+                                adf_report_container = gr.Markdown("Modify configurations and click execute to evaluate metrics.")
 
                             with gr.Column(scale=2):
-                                gr.Markdown("#### Autocorrelation Feature Spaces")
+                                sarima_fit_image = gr.Image(label="In-Sample Tracking Alignment Path", type="filepath")
+                                sarima_fit_metrics = gr.DataFrame(label="SARIMA In-Sample Performance Portfolio")
                                 diagnostic_plots_container = gr.Image(label="Dynamic ACF / PACF Spatial Coordinate Maps", type="filepath")
 
         # =====================================================================
-        # INTERACTIVE ASYNCHRONOUS DATA EVENT LISTENER MAPS
+        # ASYNCHRONOUS CONNECTOR ROUTINES AND DEPENDENCY REGISTRY
         # =====================================================================
-        # Dynamic header updates upon source data attachment
         file_input.change(fn=parse_csv_column_headers, inputs=[file_input], outputs=[target_column])
+        
+        # Ingestion block continuous plot listeners
+        ingestion_inputs = [file_input, target_column, index_column, split_size]
+        file_input.change(fn=handle_data_ingestion_visuals, inputs=ingestion_inputs, outputs=[ingestion_line_plot, ingestion_envelope_plot])
+        target_column.change(fn=handle_data_ingestion_visuals, inputs=ingestion_inputs, outputs=[ingestion_line_plot, ingestion_envelope_plot])
+        split_size.change(fn=handle_data_ingestion_visuals, inputs=ingestion_inputs, outputs=[ingestion_line_plot, ingestion_envelope_plot])
 
-        # Batch Run Triggers
+        # Batch Production Swaps Trigger
         run_batch_btn.click(
             fn=execute_ui_pipeline,
             inputs=[
@@ -316,25 +366,26 @@ def build_gradio_interface() -> gr.Blocks:
             outputs=[batch_metrics_table, batch_plot_output, batch_status]
         )
 
-        # Sandbox Tab 1: Action Triggers
+        # Sandbox Tab 1 Trigger
         calculate_decomp_btn.click(
             fn=handle_sandbox_decomposition,
             inputs=[file_input, target_column, index_column, split_size, decomp_type, decomp_period],
-            outputs=[decomp_sandbox_image]
+            outputs=[decomp_sandbox_image, decomp_sandbox_metrics]
         )
 
-        # Sandbox Tab 2: Action Triggers
+        # Sandbox Tab 2 Trigger
         calculate_hw_btn.click(
             fn=handle_sandbox_holt_winters,
             inputs=[file_input, target_column, index_column, split_size, hw_t, hw_s, hw_p],
             outputs=[hw_sandbox_image, hw_sandbox_metrics]
         )
 
-        # Sandbox Tab 3: Asynchronous Event Routing (Sliders update parameters instantly)
-        sarima_inputs = [file_input, target_column, index_column, split_size, d_slider, D_slider, m_input]
-        d_slider.change(fn=handle_sarima_stationarity_change, inputs=sarima_inputs, outputs=[adf_report_container, diagnostic_plots_container])
-        D_slider.change(fn=handle_sarima_stationarity_change, inputs=sarima_inputs, outputs=[adf_report_container, diagnostic_plots_container])
-        m_input.change(fn=handle_sarima_stationarity_change, inputs=sarima_inputs, outputs=[adf_report_container, diagnostic_plots_container])
+        # Sandbox Tab 3 Trigger
+        calculate_sarima_btn.click(
+            fn=handle_sandbox_sarima,
+            inputs=[file_input, target_column, index_column, split_size, s_p, s_d, s_q, s_P, s_D, s_Q, m_input],
+            outputs=[sarima_fit_image, sarima_fit_metrics, adf_report_container, diagnostic_plots_container]
+        )
 
     return app
 

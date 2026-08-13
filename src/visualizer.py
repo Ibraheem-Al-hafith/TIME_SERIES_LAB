@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-
-# from dataclasses import dataclass
 from typing import Optional, Tuple
 
+import matplotlib
+matplotlib.use("Agg")  # Ensure headless thread-safe execution
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
@@ -82,14 +82,6 @@ class Visualizer:
 
         if os.path.exists(target_path):
             logger.info(f"Cache Hit: Displaying cached visualization: {target_path}")
-            img = mpimg.imread(target_path)
-            fig, ax = plt.subplots(
-                figsize=self.config.default_figsize, dpi=self.config.dpi
-            )
-            ax.imshow(img)
-            ax.axis("off")
-            plt.tight_layout()
-            plt.show()
             return True, target_path
 
         return False, target_path
@@ -99,12 +91,16 @@ class Visualizer:
         target_col: str,
         distance: Optional[int] = None,
         prominence: Optional[float] = None,
-    ) -> None:
-        """Analyzes time series composition behavior (additive vs multiplicative) via envelope geometry."""
+    ) -> str:
+        """Analyzes time series composition behavior (additive vs multiplicative) via envelope geometry.
+        
+        Returns:
+            str: Path to the generated plot image.
+        """
         filename = f"envelope_analysis_{target_col}.png"
         is_cached, save_path = self._handle_plot_lifecycle(filename)
         if is_cached:
-            return
+            return save_path
 
         series = self._dataset.data[target_col].dropna().sort_index()
         y = series.values
@@ -207,16 +203,17 @@ class Visualizer:
 
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches="tight", dpi=self.config.dpi)
-        plt.show()
+        plt.close(fig)
+        return save_path
 
     def plot_seasonal_decomposition(
         self, target_col: str, period: Optional[int] = None
-    ) -> None:
+    ) -> str:
         """Decomposes the time series into Trend, Seasonal, and Residual attributes."""
         filename = f"decomposition_{target_col}.png"
         is_cached, save_path = self._handle_plot_lifecycle(filename)
         if is_cached:
-            return
+            return save_path
 
         series = self._dataset.data[target_col].dropna().sort_index()
         decomposition = sm.tsa.seasonal_decompose(
@@ -252,14 +249,15 @@ class Visualizer:
 
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches="tight", dpi=self.config.dpi)
-        plt.show()
+        plt.close(fig)
+        return save_path
 
-    def plot_autocorrelation(self, target_col: str) -> None:
+    def plot_autocorrelation(self, target_col: str) -> str:
         """Renders Autocorrelation (ACF) and Partial Autocorrelation (PACF) plots side-by-side."""
         filename = f"autocorrelation_{target_col}.png"
         is_cached, save_path = self._handle_plot_lifecycle(filename)
         if is_cached:
-            return
+            return save_path
 
         series = self._dataset.data[target_col].dropna().sort_index()
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5), dpi=self.config.dpi)
@@ -270,7 +268,6 @@ class Visualizer:
             ax=ax1,
             color="#1abc9c",
             vlines_kwargs={"color": "#16a085"},
-            # vlines_color="#16a085",
         )
         ax1.set_title(
             "Autocorrelation Function (ACF Map)", fontsize=11, fontweight="bold"
@@ -284,7 +281,6 @@ class Visualizer:
             ax=ax2,
             color="#e67e22",
             vlines_kwargs={"color": "#d35400"},
-            # vlines_color="#d35400",
         )
         ax2.set_title(
             "Partial Autocorrelation Function (PACF Map)",
@@ -300,14 +296,15 @@ class Visualizer:
         )
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches="tight", dpi=self.config.dpi)
-        plt.show()
+        plt.close(fig)
+        return save_path
 
-    def plot_line_series(self, target_col: str) -> None:
+    def plot_line_series(self, target_col: str) -> str:
         """Plots the full sequential train and test dataset slices over a unified timeline chart."""
         filename = f"line_series_{target_col}.png"
         is_cached, save_path = self._handle_plot_lifecycle(filename)
         if is_cached:
-            return
+            return save_path
 
         fig, ax = plt.subplots(figsize=self.config.default_figsize, dpi=self.config.dpi)
 
@@ -339,16 +336,17 @@ class Visualizer:
 
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches="tight", dpi=self.config.dpi)
-        plt.show()
+        plt.close(fig)
+        return save_path
 
     def plot_predictions_vs_actuals(
         self, predictions: pd.Series, target_col: str
-    ) -> None:
+    ) -> str:
         """Plots out-of-sample inference curves directly against real target arrays."""
         filename = f"predictions_vs_actuals_{target_col}.png"
         is_cached, save_path = self._handle_plot_lifecycle(filename)
         if is_cached:
-            return
+            return save_path
 
         actuals = self._dataset.test[target_col]
         aligned_df = pd.DataFrame(
@@ -405,4 +403,5 @@ class Visualizer:
 
         plt.tight_layout()
         plt.savefig(save_path, bbox_inches="tight", dpi=self.config.dpi)
-        plt.show()
+        plt.close(fig)
+        return save_path
