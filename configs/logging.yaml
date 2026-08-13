@@ -1,0 +1,44 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  simple: 
+    format: "%(asctime)s - %(levelname)s - %(message)s"
+    datefmt: "%Y-%m-%d %H:%m:%s"
+  detailed:
+    format: "%(asctime)s - %(name)s - %(levelname)s [%(filename)s:%(lineno)d] - %(message)s"
+    datefmt: "%Y-%m-%d %H:%m:%s"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO 
+    formatter: simple
+    stream: ext://sys.stdout
+  file:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: logs/open_food_mlops.log 
+    when: midnight
+    interval: 1
+    backupCount: 30
+    encoding: utf8
+
+loggers:
+  src.data:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+  src.features:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+  src.model:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+
+root: 
+  level: INFO
+  handlers: [console, file]
