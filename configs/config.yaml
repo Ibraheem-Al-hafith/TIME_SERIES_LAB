@@ -3,6 +3,7 @@ name: bera
 data:
   path: data/beer_dataset.csv # The full path to the dataset 
   split_size: 168 # Train split size 
+  target: Beer Production (ML)
 
 # Visualization configurations
 visualizer:

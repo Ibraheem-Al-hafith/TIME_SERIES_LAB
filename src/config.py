@@ -21,6 +21,7 @@ class DataConfig:
     path: str
     split_size: int
     index_col: Optional[str] = None
+    target: Optional[str] = None
 
 
 def tuple_constructor(loader, node) -> Tuple:
@@ -125,12 +126,28 @@ class SARIMAConfig:
     s: Optional[int] = None
 
 
-@dataclass
+# =====================================================================
+# IMMUTABLE CONFIGURATION SCHEMA
+# =====================================================================
+
+@dataclass(frozen=True)
 class ScoringConfig:
-    mae: bool
-    mse: bool
-    rmse: bool
-    mape: bool
+    """Immutable configuration matrix mapping metrics toggled for execution.
+
+    Attributes:
+        mae: If True, evaluates Mean Absolute Error.
+        mse: If True, evaluates Mean Squared Error.
+        rmse: If True, evaluates Root Mean Squared Error.
+        mape: If True, evaluates Mean Absolute Percentage Error.
+        epsilon: Small numerical floor value used to replace zero elements
+            if handling non-zero soft corrections inside MAPE workflows.
+            If None, encountering actual zero results in an exception.
+    """
+    mae: bool = True
+    mse: bool = True
+    rmse: bool = True
+    mape: bool = True
+    epsilon: Optional[float] = None
 
 
 @dataclass

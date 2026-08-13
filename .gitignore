@@ -220,3 +220,4 @@ __marimo__/
 # data path 
 data/
 plots/
+logs/
