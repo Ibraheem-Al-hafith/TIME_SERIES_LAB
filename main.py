@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-# Import corporate framework layer blueprints
+# Import corporate framework layer bluelogger.infos
 from src.config import Config, get_config_from_yaml
 from src.gradio_app import build_gradio_interface
 from src.orchestrator import ExperimentOrchestrator
@@ -80,7 +80,7 @@ def parse_cli_arguments(args_payload: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=str,
-        default="config.yaml",
+        default="/configs/config.yaml",
         help="Path framework pointing toward the declarative file setup targets."
     )
     
@@ -107,10 +107,6 @@ def main(cli_args: List[str]) -> None:
     # 2. Ingest, hydrate, and validate global framework parameter models
     global_config: Config = get_config_from_yaml(parsed_flags.config)
     
-    # Extract logging definitions safely with standard system overrides if keys are absent
-    log_level = getattr(global_config, "logging_level", "INFO")
-    log_file = getattr(global_config, "logging_file", "logs/execution.log")
-    
     logger.info("Application context fully initialized. Selected execution path mode: '%s'", parsed_flags.mode.upper())
 
     # 4. Route traffic dynamically to processing engines or presentation layers
@@ -132,10 +128,10 @@ def main(cli_args: List[str]) -> None:
             
             if not fallback_found:
                 logger.critical("System initialization blocked: Network interfaces locked. Unable to claim port links.")
-                print("CRITICAL ERROR: Available networking sockets are full. Gradio launch halted.", file=sys.stderr)
+                logger.error("CRITICAL ERROR: Available networking sockets are full. Gradio launch halted.", file=sys.stderr)
                 sys.exit(1)
         
-        print(f"Launching Server Dashboard Instance safely bound at: http://localhost:{preferred_port}")
+        logger.info(f"Launching Server Dashboard Instance safely bound at: http://localhost:{preferred_port}")
         app_block = build_gradio_interface()
         
         # Non-blocking deployment execution server lifecycle initialization
@@ -148,7 +144,7 @@ def main(cli_args: List[str]) -> None:
         
     elif parsed_flags.mode == "cli":
         logger.info("Executing Headless Automation Batch Sequence Model Sweep...")
-        print("Starting batch execution framework pipelines...")
+        logger.info("Starting batch execution framework pipelines...")
         
         try:
             # Instantiate our central orchestrator facade framework layer
@@ -165,24 +161,24 @@ def main(cli_args: List[str]) -> None:
             failed_count = summary_report["summary"]["failed_count"]
             total_runs = summary_report["summary"]["total_attempted"]
             
-            print(f"\n--- Batch Sweep Metrics Processing Summary ---")
-            print(f"Total Processed Strategies Checked: {total_runs}")
-            print(f"Successful Execution Counts:        {success_count}")
-            print(f"Failed Model Implementations:       {failed_count}")
+            logger.info(f"\n--- Batch Sweep Metrics Processing Summary ---")
+            logger.info(f"Total Processed Strategies Checked: {total_runs}")
+            logger.info(f"Successful Execution Counts:        {success_count}")
+            logger.info(f"Failed Model Implementations:       {failed_count}")
             
             # Check tracking constraints to determine OS process signals
             if failed_count > 0:
                 logger.error("Headless sweep cycle closed with anomalies flagged in performance suites.")
-                print("Batch sequence execution encountered validation failures on specific model matrices.", file=sys.stderr)
+                logger.info("Batch sequence execution encountered validation failures on specific model matrices.", file=sys.stderr)
                 sys.exit(1)
                 
             logger.info("Global baseline sweep finished cleanly with zero structural failure traces.")
-            print("All forecasting strategies compiled successfully.")
+            logger.info("All forecasting strategies compiled successfully.")
             sys.exit(0)
             
         except Exception as pipe_exc:
             logger.critical("Catastrophic orchestration crash encountered inside CLI execution branch: %s", pipe_exc, exc_info=True)
-            print(f"CRITICAL SYSTEM ERROR: Pipeline execution halted: {pipe_exc}", file=sys.stderr)
+            logger.info(f"CRITICAL SYSTEM ERROR: Pipeline execution halted: {pipe_exc}", file=sys.stderr)
             sys.exit(1)
 
 

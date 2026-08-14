@@ -174,7 +174,7 @@ def parse_csv_column_headers(file_obj: Any) -> gr.Dropdown:
 def execute_ui_pipeline(
     file_obj: Any, target_col: str, index_col: str, split_size: int, model_choice: str,
     mae_flag: bool, mse_flag: bool, rmse_flag: bool, mape_flag: bool,
-    decomp_mode: str, hw_trend: str, hw_seasonal: str,
+    decomp_mode: str, decompose_period,hw_trend: str, hw_seasonal: str, hw_seasonal_period: str,
     arima_p: int, arima_d: int, arima_q: int, arima_P: int, arima_D: int, arima_Q: int
 ) -> Tuple[pd.DataFrame, Optional[str], str]:
     """Compiles parameters and dispatches execution runs to the central orchestrator."""
@@ -186,8 +186,12 @@ def execute_ui_pipeline(
         scoring_cfg = ScoringConfig(mae=mae_flag, mse=mse_flag, rmse=rmse_flag, mape=mape_flag, epsilon=1e-5)
         vis_cfg = VisualizationConfig(plot_path="plots/", decomposition_model=decomp_mode)
         models_cfg = ModelsConfig(
-            decompose=DecomposeConfig(model=decomp_mode),
-            exponential_smoothing=ExponentialConfig(trend=None if hw_trend == "None" else hw_trend, seasonal=None if hw_seasonal == "None" else hw_seasonal),
+            decompose=DecomposeConfig(model=decomp_mode, period=None if decompose_period =="None" else decompose_period),
+            exponential_smoothing=ExponentialConfig(
+                trend=None if hw_trend == "None" else hw_trend,
+                seasonal=None if hw_seasonal == "None" else hw_seasonal,
+                seasonal_periods=None if hw_seasonal_period == "None" else int(hw_seasonal_period)
+                ),
             sarima=SARIMAConfig(p=int(arima_p), d=int(arima_d), q=int(arima_q), P=int(arima_P), D=int(arima_D), Q=int(arima_Q))
         )
         global_cfg = Config(name="GradioUI_Run", data=data_cfg, visualizer=vis_cfg, scoring=scoring_cfg, models=models_cfg)
@@ -270,9 +274,11 @@ def build_gradio_interface() -> gr.Blocks:
 
                         with gr.Accordion("Decomposition Overrides", open=False):
                             batch_decomp_mode = gr.Radio(choices=["additive", "multiplicative"], value="additive", label="Synthesis Type")
+                            batch_decomp_period = gr.Number(value=12, precision=0, label="Seasonal Period Component")
                         with gr.Accordion("Smoothing Overrides", open=False):
                             batch_hw_trend = gr.Dropdown(choices=["None", "add", "mul"], value="add", label="Trend Component")
                             batch_hw_seasonal = gr.Dropdown(choices=["None", "add", "mul"], value="add", label="Seasonal Component")
+                            batch_hw_seasonal_period = gr.Number(value=12, precision=0, label="Seasonal Period Component")
                         with gr.Accordion("State Space ARIMA Vectors Order", open=False):
                             with gr.Row():
                                 bp = gr.Slider(0, 5, 1, step=1, label="p")
@@ -360,7 +366,7 @@ def build_gradio_interface() -> gr.Blocks:
             inputs=[
                 file_input, target_column, index_column, split_size, batch_model_selector,
                 mae_tgl, mse_tgl, rmse_tgl, mape_tgl,
-                batch_decomp_mode, batch_hw_trend, batch_hw_seasonal,
+                batch_decomp_mode, batch_decomp_period, batch_hw_trend, batch_hw_seasonal, batch_hw_seasonal_period,
                 bp, bd, bq, bP, bD, bQ
             ],
             outputs=[batch_metrics_table, batch_plot_output, batch_status]
