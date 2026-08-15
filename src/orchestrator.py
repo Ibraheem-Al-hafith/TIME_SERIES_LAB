@@ -160,13 +160,13 @@ class ExperimentOrchestrator:
         # Instantiating a new Visualizer instance updates the runtime execution ID,
         # ensuring each experiment run is correctly isolated in its own folder.
         visualizer = Visualizer(dataset=self.data_layer, config=self.config.visualizer)
-        logger.info("Caching graphical validation outputs to target run directory [%s]...", visualizer.run_id)
+        logger.info("Caching graphical validation outputs to target run directory ...")
         visualizer.plot_predictions_vs_actuals(predictions=predictions, target_col=target_column)
 
         return {
             "model_type": model_type,
             "metrics": metrics_summary,
-            "run_id": visualizer.run_id,
+            # "run_id": visualizer.run_id,
             "predictions": predictions,
         }
 

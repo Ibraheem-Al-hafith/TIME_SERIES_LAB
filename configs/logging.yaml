@@ -19,7 +19,7 @@ handlers:
     class: logging.handlers.TimedRotatingFileHandler
     level: DEBUG
     formatter: detailed
-    filename: logs/open_food_mlops.log 
+    filename: logs/logs.log 
     when: midnight
     interval: 1
     backupCount: 30
