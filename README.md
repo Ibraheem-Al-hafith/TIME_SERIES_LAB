@@ -480,11 +480,10 @@ pip --version
 ### 3. Clone the repository
 
 ```powershell
-git clone <REPOSITORY_URL>
-cd <PROJECT_DIRECTORY>
+git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB
+cd TIME_SERIES_LAB
 ```
 
-Replace `<REPOSITORY_URL>` and `<PROJECT_DIRECTORY>` with the actual repository values.
 
 ### 4. Create a virtual environment
 
@@ -556,8 +555,8 @@ python3 -m pip --version
 ### 3. Clone the repository
 
 ```bash
-git clone <REPOSITORY_URL>
-cd <PROJECT_DIRECTORY>
+git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB
+cd TIME_SERIES_LAB
 ```
 
 ### 4. Create a virtual environment
@@ -613,8 +612,8 @@ Otherwise install an appropriate Python version for your Linux distribution.
 ### 3. Clone the repository
 
 ```bash
-git clone <REPOSITORY_URL>
-cd <PROJECT_DIRECTORY>
+git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB
+cd TIME_SERIES_LAB
 ```
 
 ### 4. Create a virtual environment
