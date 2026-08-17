@@ -582,6 +582,7 @@ def execute_ui_pipeline(
     arima_P: int,
     arima_D: int,
     arima_Q: int,
+    arima_s: int
 ) -> Tuple[pd.DataFrame, Optional[str], str, str, Optional[str]]:
     """Compiles parameters, runs orchestrator, generates Markdown report, and exports PDF document."""
     if file_obj is None or not target_col:
@@ -624,6 +625,7 @@ def execute_ui_pipeline(
                 P=int(arima_P),
                 D=int(arima_D),
                 Q=int(arima_Q),
+                s=int(arima_s)
             ),
         )
         global_cfg = Config(
@@ -812,6 +814,7 @@ def _render_batch_dashboard() -> Dict[str, Any]:
                         bP = gr.Slider(0, 3, 1, step=1, label="P")
                         bD = gr.Slider(0, 2, 1, step=1, label="D")
                         bQ = gr.Slider(0, 3, 1, step=1, label="Q")
+                    bs = gr.Number(value=12, precision=0, label='Seasonal Period Component (m)')
 
                 run_batch_btn = gr.Button(
                     "Execute Performance Pipeline Run", variant="primary"
@@ -859,6 +862,7 @@ def _render_batch_dashboard() -> Dict[str, Any]:
         "bP": bP,
         "bD": bD,
         "bQ": bQ,
+        "bs": bs,
         "run_batch_btn": run_batch_btn,
         "batch_status": batch_status,
         "batch_metrics_table": batch_metrics_table,
@@ -1077,6 +1081,7 @@ def build_gradio_interface() -> gr.Blocks:
                 batch_ui["bP"],
                 batch_ui["bD"],
                 batch_ui["bQ"],
+                batch_ui["bs"],
             ],
             outputs=[
                 batch_ui["batch_metrics_table"],

@@ -34,6 +34,7 @@ models:
     P: 1
     D: 1
     Q: 1
+    s: 1
 
 # Scoring metrics
 scoring: 
