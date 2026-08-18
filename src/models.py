@@ -1,367 +1,434 @@
-"""Stateless time series forecasting models suite for production pipelines.
+"""Model abstractions and forecasting implementations using Dependency Injection and Configurations.
 
-This module provides wrappers around classical decomposition, Holt-Winters 
-exponential smoothing, and SARIMA models. It handles hyperparameter configuration
-dynamically and safely evaluates multi-frequency temporal data indexes.
+This module provides time-series forecasting model abstractions (Decomposition,
+Exponential Smoothing, and SARIMA) that accept a centralized DataClass object and leverage
+model-specific configuration dataclasses from config.py.
 """
 
-import abc
-import logging
-from .config import (
-    DecomposeConfig,
-    ExponentialConfig, 
-    SARIMAConfig
-)
-from typing import Any, Dict, Optional, Tuple, TypeVar, Union
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
-from sklearn.linear_model import LinearRegression
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 
-# Setup module logger
-logger = logging.getLogger(__name__)
-
-# Type variable for self-referential class type-hinting
-TBaseModel = TypeVar("TBaseModel", bound="BaseModel")
-
-
-# =====================================================================
-# CUSTOM EXCEPTIONS DEFINITION
-# =====================================================================
-
-class ForecastingModelError(Exception):
-    """Base exception class for all errors inside the forecasting models module."""
-    pass
+# Assuming config.py and data.py reside in the same directory.
+from .config import DecomposeConfig, ExponentialConfig, SARIMAConfig
+from .data import DataClass
 
 
-class ModelNotFittedError(ForecastingModelError):
-    """Raised when predict() is called before a model is successfully fitted."""
-    pass
+class ConfigurationError(Exception):
+    """Raised when configuration requirements, model settings, or column bindings are invalid."""
 
 
-class DomainValidationError(ForecastingModelError):
-    """Raised when mathematical prerequisites or spatial domains are violated."""
-    pass
+class ModelNotFittedError(Exception):
+    """Raised when prediction or evaluation is attempted prior to fitting."""
 
 
-class FrequencyInferenceError(ForecastingModelError):
-    """Raised when data index frequency cannot be resolved automatically or manually."""
-    pass
+class BaseModel(ABC):
+    """Abstract Base Class for all forecasting models.
 
+    Defines the standardized interface for model fitting, prediction, and target
+    resolution using Dependency Injection via DataClass and configuration schemas.
 
-
-ConfigTypes = Union[DecomposeConfig, ExponentialConfig, SARIMAConfig]
-
-
-# =====================================================================
-# BASE CONTRACT STRATEGY
-# =====================================================================
-
-class BaseModel(abc.ABC):
-    """Abstract interface dictating the structural contract for all forecasting models.
-
-    Enforces stateless configuration execution and dynamic temporal frequency parsing.
+    Attributes:
+        is_fitted (bool): Indicates whether model parameters have been estimated.
+        target_col (Optional[str]): The resolved target column name used during fit.
     """
 
-    def __init__(self, model_config: ConfigTypes) -> None:
-        """Initializes the model wrapper with a read-only configuration payload.
-
-        Args:
-            model_config: Config data class containing parameters tailored to the implementation.
-        """
-        self.config: ConfigTypes = model_config
+    def __init__(self) -> None:
+        """Initialize the base forecasting model."""
         self.is_fitted: bool = False
-        logger.debug("Initialized %s with config: %s", self.__class__.__name__, model_config)
+        self.target_col: Optional[str] = None
 
-    def _resolve_frequency_period(self, index: pd.Index, manual_period: Optional[int]) -> int:
-        """Inspects the pandas Index structural attributes to locate temporal frequency patterns.
-
-        Maps string tags to numeric integers. Falls back to manual configuration if inference fails.
+    def _resolve_target_series(
+        self, data_obj: DataClass, target_col: Optional[str] = None
+    ) -> pd.Series:
+        """Extract and validate the target time series vector from DataClass.
 
         Args:
-            index: The pandas Index derived from the source training collection.
-            manual_period: Explicit period definition overridden via operational config.
+            data_obj (DataClass): Data container holding config and train/test splits.
+            target_col (Optional[str]): Explicit override for the target column name.
 
         Returns:
-            An integer mapping representing the number of observations per cycle.
+            pd.Series: Clean target series vector.
 
         Raises:
-            FrequencyInferenceError: If frequency cannot be inferred and manual_period is missing.
+            ConfigurationError: If no target column is specified, if train data is missing,
+                or if the target column does not exist in the training dataset.
         """
-        if manual_period is not None and manual_period > 0:
-            logger.info("Using manually configured seasonal period: %d", manual_period)
-            return manual_period
+        if data_obj is None:
+            raise ConfigurationError("DataClass instance ('data_obj') cannot be None.")
 
-        # Extract frequency properties safely across multiple pandas configurations
-        freq_str: Optional[str] = getattr(index, "freqstr", None) or getattr(index, "inferred_freq", None)
-
-        if freq_str is None:
-            raise FrequencyInferenceError(
-                "Data index lacks explicit temporal frequency metadata. "
-                "Ensure pandas index frequency is declared or provide a manual configuration period value."
+        # Step 1: Resolve target column identifier
+        resolved_target = target_col or getattr(getattr(data_obj, "config", None), "target", None)
+        if not resolved_target:
+            raise ConfigurationError(
+                "Target column is not specified explicitly and data_obj.config.target is undefined."
             )
 
-        # Base Frequency mapping matrix
-        frequency_map: Dict[str, int] = {
-            "MS": 12, "M": 12,   # Monthly variants
-            "QS": 4,  "Q": 4,    # Quarterly variants
-            "D": 7,              # Daily variant (weekly seasonal cycle)
-            "W": 52              # Weekly variant
-        }
+        # Step 2: Validate training dataframe presence
+        if not hasattr(data_obj, "train") or data_obj.train is None or data_obj.train.empty:
+            raise ConfigurationError("Injected 'data_obj' does not contain a valid non-empty 'train' DataFrame.")
 
-        # Substring match to route variants like 'MS', 'M', 'QS', 'Q' accurately
-        for key, value in frequency_map.items():
-            if key in freq_str:
-                logger.info("Inferred seasonal period from index frequency '%s' -> %d", freq_str, value)
-                return value
+        # Step 3: Check column existence in training set
+        if resolved_target not in data_obj.train.columns:
+            raise ConfigurationError(
+                f"Target column '{resolved_target}' not found in training dataset. "
+                f"Available columns: {list(data_obj.train.columns)}"
+            )
 
-        raise FrequencyInferenceError(
-            f"Unsupported frequency pattern identified: '{freq_str}'. "
-            f"Provide an explicit integer period within your configuration structure."
-        )
+        self.target_col = resolved_target
+        series = data_obj.train[resolved_target].dropna()
 
-    @abc.abstractmethod
-    def fit(self, df: pd.DataFrame, target_col: str) -> TBaseModel:
-        """Fits the underlying model strategy on the targeted training slice.
+        if series.empty:
+            raise ConfigurationError(f"Target column '{resolved_target}' contains no valid data after dropna().")
+
+        return series
+
+    @abstractmethod
+    def fit(self, data_obj: DataClass, target_col: Optional[str] = None) -> BaseModel:
+        """Fit the forecasting model to the dataset using configuration settings.
 
         Args:
-            df: Ingestion dataframe housing training vectors.
-            target_col: Label identifier of the target series column.
+            data_obj (DataClass): Data container instance containing dataset and config.
+            target_col (Optional[str]): Optional column name override. Defaults to config.target.
 
         Returns:
-            The instance of the fitted model wrapper execution layer.
+            BaseModel: Self instance for method chaining.
         """
         pass
 
-    @abc.abstractmethod
+    @abstractmethod
     def predict(self, steps: int) -> pd.Series:
-        """Projects future timeline values spanning across the requested allocation window.
+        """Generate out-of-sample forecasts.
 
         Args:
-            steps: Integer length of out-of-sample observations to compute.
+            steps (int): Number of future periods to forecast.
 
         Returns:
-            A clean pandas Series containing predictions matched with a continuous future DatetimeIndex.
-
-        Raises:
-            ModelNotFittedError: If execution is requested before running a successful fit operation.
+            pd.Series: Forecasted values.
         """
         pass
 
-
-# =====================================================================
-# CONCRETE IMPLEMENTATION: CLASSICAL DECOMPOSITION FORECASTER
-# =====================================================================
 
 class DecompositionModel(BaseModel):
-    """Extends statistical decomposition into an active forecasting tool.
+    """Classical Additive or Multiplicative Seasonal Decomposition Forecaster.
 
-    Fits an ordinary least squares linear trend component and loops historical
-    seasonal variances forward into the evaluation window.
+    Uses `statsmodels.tsa.seasonal.seasonal_decompose` to break down time series
+    into trend, seasonal, and residual components based on `DecomposeConfig`.
+
+    Attributes:
+        config (Optional[DecomposeConfig]): Model configuration instance.
+        trend_slope (float): Linear trend slope extracted from historical trend component.
+        trend_intercept (float): Linear trend intercept extracted from historical trend component.
+        seasonal_pattern (np.ndarray): Repeated seasonal factor pattern.
+        last_index (int): Time index offset tracking end of training sequence.
     """
 
-    def __init__(self, model_config: DecomposeConfig) -> None:
-        super().__init__(model_config)
-        self.config: DecomposeConfig = model_config
-        
-        # Internal states populated post-fit
-        self.last_training_index: Optional[Any] = None
-        self.index_freq: Optional[Any] = None
-        self.resolved_period: int = 1
-        self.trend_regressor: Optional[LinearRegression] = None
-        self.trend_base_length: int = 0
-        self.seasonal_cycle_block: Optional[np.ndarray] = None
+    def __init__(self, config: Optional[DecomposeConfig] = None) -> None:
+        """Initialize DecompositionModel with optional DecomposeConfig.
 
-    def fit(self, df: pd.DataFrame, target_col: str) -> "DecompositionModel":
-        if target_col not in df.columns:
-            raise KeyError(f"Target column '{target_col}' not found within provided DataFrame columns.")
+        Args:
+            config (Optional[DecomposeConfig]): Configuration instance. If None, resolves
+                from data_obj.config at fit time.
+        """
+        super().__init__()
+        self.config: Optional[DecomposeConfig] = config
+        self.trend_slope: float = 0.0
+        self.trend_intercept: float = 0.0
+        self.seasonal_pattern: Optional[np.ndarray] = None
+        self.last_index: int = 0
 
-        series: pd.Series = df[target_col].dropna()
-        if series.empty:
-            raise ValueError(f"Extracted target series '{target_col}' contains no valid computational elements.")
+    def _resolve_config(self, data_obj: DataClass) -> DecomposeConfig:
+        """Resolve model configuration from explicit initialization or injected DataClass.
 
-        # Multiplicative domain safety verification
-        if self.config.model == "multiplicative" and (series <= 0).any():
-            raise DomainValidationError(
-                "Multiplicative decomposition models fail mathematically when encountering values <= 0. "
-                "Cleanse training slice or switch configuration model to 'additive'."
+        Args:
+            data_obj (DataClass): Injected dataset container.
+
+        Returns:
+            DecomposeConfig: Resolved decomposition configuration.
+
+        Raises:
+            ConfigurationError: If no valid DecomposeConfig can be found.
+        """
+        if self.config is not None:
+            return self.config
+
+        data_config = getattr(data_obj, "config", None)
+        model_config = getattr(data_config, "decompose", None)
+
+        if isinstance(model_config, DecomposeConfig):
+            return model_config
+
+        # Default fallback if not defined in data_obj.config
+        return DecomposeConfig()
+
+    def fit(self, data_obj: DataClass, target_col: Optional[str] = None) -> DecompositionModel:
+        """Fit classical decomposition model on target series using statsmodels.
+
+        Args:
+            data_obj (DataClass): Injected data container.
+            target_col (Optional[str]): Optional target column override.
+
+        Returns:
+            DecompositionModel: The fitted model instance.
+
+        Raises:
+            ConfigurationError: If data length is insufficient or values violate model assumptions.
+        """
+        series = self._resolve_target_series(data_obj, target_col)
+        self.config = self._resolve_config(data_obj)
+
+        period = self.config.period
+        model_type = self.config.model
+
+        if len(series) < period * 2:
+            raise ConfigurationError(
+                f"Insufficient data points ({len(series)}) for seasonal decomposition with period ({period}). "
+                f"At least {period * 2} points required."
             )
 
-        self.last_training_index = series.index[-1]
-        
-        # Standardize fallback options if explicit frequencies are truncated
-        self.index_freq = series.index.freq or pd.tseries.frequencies.to_offset(
-            getattr(series.index, "inferred_freq", None)
-        )
-        
-        self.resolved_period = self._resolve_frequency_period(series.index, self.config.period)
+        if model_type == "multiplicative" and (series <= 0).any():
+            raise ConfigurationError(
+                "Multiplicative decomposition requires strictly positive time series values."
+            )
 
-        # Decompose the isolated signal array using statsmodels infrastructure
-        decomposition = sm.tsa.seasonal_decompose(
+        # Execute statsmodels classical decomposition
+        decomposition = seasonal_decompose(
             series,
-            model=self.config.model,
-            period=self.resolved_period
+            model=model_type,
+            period=period,
+            extrapolate_trend="freq",
         )
 
-        # Drop missing boundaries safely to generate a clean signal for trend estimation
-        valid_indices = ~np.isnan(decomposition.trend)
-        clean_trend: pd.Series = decomposition.trend[valid_indices]
+        trend = decomposition.trend.dropna()
+        seasonal = decomposition.seasonal
 
-        if clean_trend.empty:
-            raise DomainValidationError(
-                "Insufficient observation window to compute statistical trend components. "
-                "Expand training length context."
-            )
+        # Fit OLS linear model on the extracted trend to project out-of-sample trend
+        x_trend = np.arange(len(series))
+        y_trend = trend.values
+        slope, intercept = np.polyfit(x_trend, y_trend, 1)
 
-        # Fit robust ordinary least squares model across calculated trend matrices
-        x_indices = np.arange(len(clean_trend)).reshape(-1, 1)
-        y_values = clean_trend.values
-        
-        self.trend_regressor = LinearRegression()
-        self.trend_regressor.fit(x_indices, y_values)
-        self.trend_base_length = len(series)
+        self.trend_slope = float(slope)
+        self.trend_intercept = float(intercept)
 
-        # Isolate exactly one complete seasonal wave from the tail bounds of historical cycles
-        self.seasonal_cycle_block = decomposition.seasonal.iloc[-self.resolved_period:].values
+        # Extract 1 full period of seasonal pattern
+        raw_seasonal_cycle = seasonal.values[-period:]
+        if model_type == "additive":
+            self.seasonal_pattern = raw_seasonal_cycle - np.mean(raw_seasonal_cycle)
+        else:  # multiplicative
+            mean_val = np.mean(raw_seasonal_cycle)
+            self.seasonal_pattern = raw_seasonal_cycle / (mean_val if mean_val != 0 else 1.0)
 
+        self.last_index = len(series)
         self.is_fitted = True
+
         return self
 
     def predict(self, steps: int) -> pd.Series:
-        if not self.is_fitted or self.trend_regressor is None or self.seasonal_cycle_block is None:
-            raise ModelNotFittedError("Model execution halted: Run fit routine before calling predict paths.")
-        
+        """Generate forecasts by projecting linear trend and applying periodic seasonality.
+
+        Args:
+            steps (int): Horizon step count for projection.
+
+        Returns:
+            pd.Series: Forecasted values.
+
+        Raises:
+            ModelNotFittedError: If the model has not been fitted prior to prediction.
+            ValueError: If step count is non-positive.
+        """
+        if not self.is_fitted or self.config is None or self.seasonal_pattern is None:
+            raise ModelNotFittedError("DecompositionModel must be fitted before generating predictions.")
         if steps <= 0:
-            raise ValueError("Prediction horizon length steps must be a positive integer greater than 0.")
+            raise ValueError("Prediction steps must be a positive integer.")
 
-        # Generate target calendar index markers tracking continuous out-of-sample steps safely
-        future_index = pd.date_range(
-            start=self.last_training_index + (self.index_freq * 1),
-            periods=steps,
-            freq=self.index_freq
-        )
+        period = self.config.period
+        future_x = np.arange(self.last_index, self.last_index + steps)
+        projected_trend = self.trend_intercept + self.trend_slope * future_x
 
-        # Extrapolate linear trend vector systematically
-        trend_steps = np.arange(self.trend_base_length, self.trend_base_length + steps).reshape(-1, 1)
-        projected_trend: np.ndarray = self.trend_regressor.predict(trend_steps)
+        seasonal_factors = np.array([self.seasonal_pattern[i % period] for i in future_x])
 
-        # Replicate historical seasonal patterns indefinitely across target steps
-        repetitions = int(np.ceil(steps / self.resolved_period))
-        extended_seasonals = np.tile(self.seasonal_cycle_block, repetitions)[:steps]
+        if self.config.model == "additive":
+            forecast = projected_trend + seasonal_factors
+        else:  # multiplicative
+            forecast = projected_trend * seasonal_factors
 
-        # Combine vector blocks based on configured algebraic model structures
-        if self.config.model == "multiplicative":
-            forecast_values = projected_trend * extended_seasonals
-        else:
-            forecast_values = projected_trend + extended_seasonals
+        return pd.Series(forecast, name=f"{self.target_col}_forecast")
 
-        return pd.Series(forecast_values, index=future_index, name="decomposition_forecast")
-
-
-# =====================================================================
-# CONCRETE IMPLEMENTATION: HOLT-WINTERS EXPONENTIAL SMOOTHING
-# =====================================================================
 
 class ExponentialSmoothingModel(BaseModel):
-    """Wraps statsmodels state space Exponential Smoothing infrastructure."""
+    """Holt-Winters Exponential Smoothing Forecaster controlled via ExponentialConfig.
 
-    def __init__(self, model_config: ExponentialConfig) -> None:
-        super().__init__(model_config)
-        self.config: ExponentialConfig = model_config
-        self.fitted_results: Optional[Any] = None
+    Attributes:
+        config (Optional[ExponentialConfig]): Model hyperparameter configuration object.
+        fitted_model (Any): Fitted statsmodels ExponentialSmoothingResults object.
+    """
 
-    def fit(self, df: pd.DataFrame, target_col: str) -> "ExponentialSmoothingModel":
-        if target_col not in df.columns:
-            raise KeyError(f"Target column '{target_col}' not found within provided DataFrame columns.")
+    def __init__(self, config: Optional[ExponentialConfig] = None) -> None:
+        """Initialize ExponentialSmoothingModel with optional ExponentialConfig.
 
-        series = df[target_col].dropna()
-        if series.empty:
-            raise ValueError("Extracted target series contains no valid computational elements.")
+        Args:
+            config (Optional[ExponentialConfig]): Configuration schema instance.
+        """
+        super().__init__()
+        self.config: Optional[ExponentialConfig] = config
+        self.fitted_model: Any = None
 
-        # Handle structural validation for multiplicative variations
-        is_multiplicative = (self.config.trend == "mul") or (self.config.seasonal == "mul")
-        if is_multiplicative and (series <= 0).any():
-            raise DomainValidationError(
-                "Multiplicative Holt-Winters metrics crash when encountering observations <= 0."
-            )
+    def _resolve_config(self, data_obj: DataClass) -> ExponentialConfig:
+        """Resolve model configuration from explicit initialization or injected DataClass.
 
-        # Extract context attributes dynamically
-        period = self._resolve_frequency_period(series.index, self.config.seasonal_periods)
+        Args:
+            data_obj (DataClass): Injected dataset container.
 
-        # Instantiate implementation engine directly mapping framework specifications
-        model_engine = sm.tsa.ExponentialSmoothing(
+        Returns:
+            ExponentialConfig: Resolved configuration object.
+        """
+        if self.config is not None:
+            return self.config
+
+        data_config = getattr(data_obj, "config", None)
+        model_config = getattr(data_config, "exponential", None)
+
+        if isinstance(model_config, ExponentialConfig):
+            return model_config
+
+        return ExponentialConfig()
+
+    def fit(self, data_obj: DataClass, target_col: Optional[str] = None) -> ExponentialSmoothingModel:
+        """Fit Holt-Winters Exponential Smoothing estimator using resolved parameters.
+
+        Args:
+            data_obj (DataClass): Injected data container.
+            target_col (Optional[str]): Optional target column override.
+
+        Returns:
+            ExponentialSmoothingModel: Fitted model instance.
+        """
+        series = self._resolve_target_series(data_obj, target_col)
+        self.config = self._resolve_config(data_obj)
+
+        model = ExponentialSmoothing(
             series,
             trend=self.config.trend,
             seasonal=self.config.seasonal,
-            seasonal_periods=period,
-            initialization_method="estimated"
+            seasonal_periods=self.config.seasonal_periods,
+            initialization_method="estimated",
         )
-
-        self.fitted_results = model_engine.fit()
+        self.fitted_model = model.fit()
         self.is_fitted = True
+
         return self
 
     def predict(self, steps: int) -> pd.Series:
-        if not self.is_fitted or self.fitted_results is None:
-            raise ModelNotFittedError("Model execution halted: Run fit routine before calling predict paths.")
-        
+        """Generate out-of-sample forecast using fitted Holt-Winters estimator.
+
+        Args:
+            steps (int): Horizon step count for projection.
+
+        Returns:
+            pd.Series: Forecasted values.
+        """
+        if not self.is_fitted or self.fitted_model is None:
+            raise ModelNotFittedError("ExponentialSmoothingModel is not fitted.")
         if steps <= 0:
-            raise ValueError("Prediction horizon length steps must be a positive integer greater than 0.")
+            raise ValueError("Steps must be a positive integer.")
 
-        forecast = self.fitted_results.forecast(steps=steps)
-        return pd.Series(forecast, name="holt_winters_forecast")
+        forecast = self.fitted_model.forecast(steps)
+        forecast.name = f"{self.target_col}_forecast"
+        return forecast
 
-
-# =====================================================================
-# CONCRETE IMPLEMENTATION: SEASONAL ARIMA (SARIMAX)
-# =====================================================================
 
 class SARIMAModel(BaseModel):
-    """Wraps statsmodels SARIMAX modeling framework for comprehensive forecasting."""
+    """Seasonal AutoRegressive Integrated Moving Average Forecaster controlled via SARIMAConfig.
 
-    def __init__(self, model_config: SARIMAConfig) -> None:
-        super().__init__(model_config)
-        self.config: SARIMAConfig = model_config
-        self.fitted_results: Optional[Any] = None
+    Attributes:
+        config (Optional[SARIMAConfig]): Model order parameter configuration object.
+        fitted_model (Any): Fitted statsmodels SARIMAXResults object.
+    """
 
-    def fit(self, df: pd.DataFrame, target_col: str) -> "SARIMAModel":
-        if target_col not in df.columns:
-            raise KeyError(f"Target column '{target_col}' not found within provided DataFrame columns.")
+    def __init__(self, config: Optional[SARIMAConfig] = None) -> None:
+        """Initialize SARIMA model with optional SARIMAConfig.
 
-        series = df[target_col].dropna()
-        if series.empty:
-            raise ValueError("Extracted target series contains no valid computational elements.")
+        Args:
+            config (Optional[SARIMAConfig]): Model order parameters.
+        """
+        super().__init__()
+        self.config: Optional[SARIMAConfig] = config
+        self.fitted_model: Any = None
 
-        # Intercept temporal structures to resolve seasonal lags securely
-        period = self._resolve_frequency_period(series.index, self.config.s)
+    def _resolve_config(self, data_obj: DataClass) -> SARIMAConfig:
+        """Resolve model configuration from explicit initialization or injected DataClass.
 
-        # Map vector tuples expected directly by the Statsmodels execution framework
-        order_tuple: Tuple[int, int, int] = (self.config.p, self.config.d, self.config.q)
-        seasonal_order_tuple: Tuple[int, int, int, int] = (
-            self.config.P, self.config.D, self.config.Q, period
+        Args:
+            data_obj (DataClass): Injected dataset container.
+
+        Returns:
+            SARIMAConfig: Resolved configuration object.
+        """
+        if self.config is not None:
+            return self.config
+
+        data_config = getattr(data_obj, "config", None)
+        model_config = getattr(data_config, "sarima", None)
+
+        if isinstance(model_config, SARIMAConfig):
+            return model_config
+
+        return SARIMAConfig()
+
+    def fit(self, data_obj: DataClass, target_col: Optional[str] = None) -> SARIMAModel:
+        """Estimate SARIMAX parameters using configuration state.
+
+        Args:
+            data_obj (DataClass): Injected data container.
+            target_col (Optional[str]): Optional target column override.
+
+        Returns:
+            SARIMAModel: Fitted model instance.
+        """
+        series = self._resolve_target_series(data_obj, target_col)
+        self.config = self._resolve_config(data_obj)
+
+        order: Tuple[int, int, int] = (self.config.p, self.config.d, self.config.q)
+        seasonal_order: Tuple[int, int, int, int] = (
+            self.config.P,
+            self.config.D,
+            self.config.Q,
+            self.config.s if self.config.s is not None else 0,
         )
 
-        # Construct analytical state-space model pipelines
-        model_engine = sm.tsa.statespace.SARIMAX(
+        model = SARIMAX(
             series,
-            order=order_tuple,
-            seasonal_order=seasonal_order_tuple,
+            order=order,
+            seasonal_order=seasonal_order,
             enforce_stationarity=False,
-            enforce_invertibility=False
+            enforce_invertibility=False,
         )
-
-        # Suppress standard convergence logs to streamline UI execution pipelines
-        self.fitted_results = model_engine.fit(disp=False)
+        self.fitted_model = model.fit(disp=False)
         self.is_fitted = True
+
         return self
 
     def predict(self, steps: int) -> pd.Series:
-        if not self.is_fitted or self.fitted_results is None:
-            raise ModelNotFittedError("Model execution halted: Run fit routine before calling predict paths.")
-        
-        if steps <= 0:
-            raise ValueError("Prediction horizon length steps must be a positive integer greater than 0.")
+        """Project out-of-sample target predictions.
 
-        forecast = self.fitted_results.forecast(steps=steps)
-        return pd.Series(forecast, name="sarima_forecast")
+        Args:
+            steps (int): Number of steps ahead to forecast.
+
+        Returns:
+            pd.Series: Forecast sequence.
+        """
+        if not self.is_fitted or self.fitted_model is None:
+            raise ModelNotFittedError("SARIMAModel must be fitted before generating predictions.")
+        if steps <= 0:
+            raise ValueError("Steps must be a positive integer.")
+
+        forecast = self.fitted_model.forecast(steps=steps)
+        forecast.name = f"{self.target_col}_forecast"
+        return forecast

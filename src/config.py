@@ -82,11 +82,13 @@ class DecomposeConfig:
         period: Optional manual definition of seasonal periods. If None, inferred automatically.
     """
     model: str = "additive"
-    period: Optional[int] = None
+    period: int = 12
 
     def __post_init__(self) -> None:
         if self.model not in ("additive", "multiplicative"):
             raise ValueError("Model attribute must be either 'additive' or 'multiplicative'.") 
+        if self.period <= 0:
+                raise ValueError("Decomposition period must be a positive integer.")
 
 
 
