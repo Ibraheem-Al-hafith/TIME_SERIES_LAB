@@ -1,458 +1,281 @@
-# 🔬 Time Series Research Lab
+# 📈 Time Series Lab
 
-> **An experiment-first research environment for time series forecasting — investigate models, diagnostics, and hypotheses without drowning in implementation overhead.**
+> **A practical, configuration-driven time-series forecasting and analytics laboratory — from raw data ingestion to diagnostics, forecasting, evaluation, visualization, and report generation.**
 
-[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Gradio](https://img.shields.io/badge/UI-Gradio-FF7C00?logo=gradio&logoColor=white)](https://www.gradio.app/)
-[![pandas](https://img.shields.io/badge/Data-pandas-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
-[![Statsmodels](https://img.shields.io/badge/Statistics-statsmodels-4051B5)](https://www.statsmodels.org/)
-[![License](https://img.shields.io/badge/License-See%20LICENSE-lightgrey)](LICENSE)
+<!-- DEMO PLACEHOLDER
+Replace this block with a real GIF/video/demo once one is available.
 
----
+Example:
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Time Series Lab interactive demo" width="900">
+</p>
 
-## 🧪 What Is This?
+<p align="center">
+  <a href="YOUR_DEMO_URL">🚀 Live Demo</a>
+  ·
+  <a href="YOUR_VIDEO_URL">🎥 Demo Video</a>
+</p>
+-->
 
-**Time Series Research Lab is a research-oriented experimentation environment for classical time series forecasting.**
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12+">
+  <img src="https://img.shields.io/badge/Package%20Manager-uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white" alt="uv">
+  <img src="https://img.shields.io/badge/Interface-Gradio-FF7C00?style=for-the-badge" alt="Gradio">
+  <img src="https://img.shields.io/badge/Tests-pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white" alt="pytest">
+  <img src="https://img.shields.io/badge/Status-Experimental-yellow?style=for-the-badge" alt="Experimental status">
+</p>
 
-The goal is simple:
-
-> **Let researchers spend their time investigating experiments instead of repeatedly writing infrastructure code.**
-
-When conducting forecasting research, a large amount of effort can disappear into tasks that are not actually the research question:
-
-- loading and validating datasets
-- creating train/test splits
-- configuring models
-- implementing forecasting loops
-- calculating evaluation metrics
-- generating diagnostic plots
-- comparing models
-- producing experiment reports
-- maintaining visualization code
-- handling logging and configuration
-
-This project centralizes those responsibilities into a reusable experimentation workflow.
-
-Instead of repeatedly implementing the same pipeline, a researcher can focus on questions such as:
-
-> *Is this series stationary?*
-
-> *Does the observed seasonality justify a seasonal model?*
-
-> *How does Holt-Winters compare with SARIMA on this dataset?*
-
-> *Which model performs best on the out-of-sample horizon?*
-
-> *What do the ACF/PACF and decomposition diagnostics tell us about the underlying temporal structure?*
-
-The system is therefore designed as a **research laboratory**, not simply as a forecasting application.
+<p align="center">
+  <strong>🧠 Forecast</strong>
+  &nbsp;·&nbsp;
+  <strong>🔬 Diagnose</strong>
+  &nbsp;·&nbsp;
+  <strong>📊 Evaluate</strong>
+  &nbsp;·&nbsp;
+  <strong>📈 Visualize</strong>
+  &nbsp;·&nbsp;
+  <strong>📝 Report</strong>
+</p>
 
 ---
 
-## 🎯 Research Philosophy
+## ✨ Why This Project?
+
+Time-series experimentation often becomes a collection of disconnected notebooks, scripts, plots, and manually maintained environments.
+
+**Time Series Lab** brings those concerns into one Python project:
 
 ```text
-                 ┌─────────────────────────────┐
-                 │      Research Question      │
-                 └──────────────┬──────────────┘
-                                │
-                                ▼
-                 ┌─────────────────────────────┐
-                 │      Dataset / Hypothesis   │
-                 └──────────────┬──────────────┘
-                                │
-                                ▼
-                 ┌─────────────────────────────┐
-                 │       Diagnostics            │
-                 │  • Stationarity             │
-                 │  • Seasonality              │
-                 │  • ACF / PACF               │
-                 │  • Decomposition            │
-                 └──────────────┬──────────────┘
-                                │
-                                ▼
-                 ┌─────────────────────────────┐
-                 │      Model Experiments      │
-                 │  • Decomposition            │
-                 │  • Holt-Winters             │
-                 │  • SARIMA                   │
-                 └──────────────┬──────────────┘
-                                │
-                                ▼
-                 ┌─────────────────────────────┐
-                 │       Evaluation            │
-                 │  • MAE                      │
-                 │  • MSE                      │
-                 │  • RMSE                     │
-                 │  • MAPE                     │
-                 └──────────────┬──────────────┘
-                                │
-                                ▼
-                 ┌─────────────────────────────┐
-                 │     Visual Interpretation   │
-                 └──────────────┬──────────────┘
-                                │
-                                ▼
-                 ┌─────────────────────────────┐
-                 │      Research Conclusion    │
-                 └─────────────────────────────┘
+📂 Dataset
+   │
+   ▼
+📥 Data ingestion & train/test split
+   │
+   ├───────────────┐
+   ▼               ▼
+🔬 Diagnostics    📊 Visual analysis
+   │               │
+   └───────┬───────┘
+           ▼
+      🤖 Forecasting
+      ├─ Decomposition
+      ├─ Holt-Winters
+      └─ SARIMA
+           │
+           ▼
+      📏 Evaluation
+      ├─ MAE
+      ├─ MSE
+      ├─ RMSE
+      └─ MAPE
+           │
+           ▼
+     📈 Predictions
+           │
+           ▼
+      📝 Reports
+      ├─ Markdown
+      └─ PDF*
 ```
 
-The architecture reflects this workflow directly: the experiment orchestrator coordinates ingestion, model construction, scoring, forecasting, and visualization.
+> [!IMPORTANT]
+> `*` PDF export depends on the installed rendering stack and may be skipped gracefully by the application if PDF rendering fails.
 
 ---
 
-# ✨ Why This Project Exists
+## 🧭 Table of Contents
 
-Traditional experimentation often looks like this:
-
-```text
-Research Question
-      │
-      ▼
-Write preprocessing code
-      │
-      ▼
-Write model code
-      │
-      ▼
-Write evaluation code
-      │
-      ▼
-Write plotting code
-      │
-      ▼
-Fix data/index issues
-      │
-      ▼
-Repeat everything for another model
-      │
-      ▼
-Finally investigate the hypothesis
-```
-
-This project aims to move the researcher toward:
-
-```text
-Research Question
-      │
-      ▼
-Configure Experiment
-      │
-      ▼
-Run
-      │
-      ├── Diagnostics
-      ├── Forecasting
-      ├── Metrics
-      ├── Visualizations
-      └── Report
-      │
-      ▼
-Investigate Results
-```
-
-### 🧠 The central idea
-
-**The code is the laboratory infrastructure.**
-
-**The experiment is the research.**
+- [✨ Why This Project?](#-why-this-project)
+- [🚀 What It Can Do](#-what-it-can-do)
+- [🏗️ Architecture](#️-architecture)
+- [📦 Project Structure](#-project-structure)
+- [💻 Requirements](#-requirements)
+- [⚡ Installation](#-installation)
+  - [Windows](#windows)
+  - [macOS](#macos)
+  - [Linux](#linux)
+  - [Verify the Installation](#verify-the-installation)
+- [🧪 Run the Tests](#-run-the-tests)
+- [▶️ Run the Application](#️-run-the-application)
+  - [Headless CLI Pipeline](#1-headless-cli-pipeline)
+  - [Interactive Gradio UI](#2-interactive-gradio-ui)
+- [⚙️ Configuration](#️-configuration)
+- [📊 Input Data](#-input-data)
+- [🤖 Forecasting Models](#-forecasting-models)
+- [🔬 Diagnostics](#-diagnostics)
+- [📏 Evaluation Metrics](#-evaluation-metrics)
+- [📈 Visualizations & Outputs](#-visualizations--outputs)
+- [📓 Notebooks](#-notebooks)
+- [🧩 Codebase Map](#-codebase-map)
+- [🛠️ Development Workflow](#️-development-workflow)
+- [🔎 Troubleshooting](#-troubleshooting)
+- [🤝 Contributing](#-contributing)
+- [📜 License](#-license)
 
 ---
 
-# 🚀 What Can It Do?
+## 🚀 What It Can Do
 
-## 📊 Data Ingestion
-
-The data layer supports:
-
-- CSV
-- Excel (`.xlsx`, `.xls`)
-- Parquet
-
-It can optionally convert a configured column into a datetime index, sort the resulting time series, and create train/test partitions. 
----
-
-## 🔬 Statistical Diagnostics
-
-The diagnostic engine currently supports:
-
-- **ADF — Augmented Dickey-Fuller**
-- **KPSS — Kwiatkowski-Phillips-Schmidt-Shin**
-- Seasonal decomposition
-- Model fitting diagnostics
-- Stationarity reporting
-
-ADF and KPSS are evaluated jointly to distinguish outcomes such as:
-
-- Strictly stationary
-- Difference stationary
-- Trend stationary
-- Non-stationary
-- Insufficient data / error
-
-
-
----
-
-## 📈 Forecasting Experiments
-
-The current model registry contains three forecasting strategies:
-
-| Model | Research Role |
+| Capability | What it provides |
 |---|---|
-| 🧩 Classical Decomposition | Investigate trend + seasonal structure |
-| 📉 Holt-Winters | Investigate level, trend, and seasonal smoothing |
-| 📐 SARIMA | Investigate autoregressive, differencing, moving-average, and seasonal dynamics |
-
-The registry maps experiment names to concrete model implementations, making the execution pipeline independent from individual model implementations.
-
-### Classical Decomposition
-
-The decomposition model extracts seasonal structure and estimates a trend component before extending the resulting structure into the forecast horizon.
-
-### Holt-Winters
-
-The exponential smoothing implementation supports configurable trend, seasonal behavior, and seasonal periods.
-
-### SARIMA
-
-The SARIMA implementation wraps Statsmodels' SARIMAX engine and exposes configurable non-seasonal and seasonal orders.
+| 📥 **Data ingestion** | Loads CSV, Excel, and Parquet datasets through the data layer. |
+| ✂️ **Train/test splitting** | Uses a configurable row boundary to create training and evaluation sets. |
+| 📅 **Time-aware indexing** | Supports an optional datetime/index column. |
+| 📈 **Visualization** | Generates line, envelope, seasonal, decomposition, prediction, and related diagnostic plots. |
+| 🔬 **Stationarity analysis** | Combines ADF and KPSS tests into a single diagnostic result. |
+| 🤖 **Forecasting** | Provides classical decomposition, Holt-Winters exponential smoothing, and SARIMA model implementations. |
+| 📏 **Scoring** | Supports MAE, MSE, RMSE, and MAPE with alignment and missing-value validation. |
+| 🧪 **Automated tests** | Includes pytest-based data and visualization tests. |
+| 🖥️ **Interactive UI** | Provides a Gradio-based interface for dataset exploration and experimentation. |
+| 🧾 **Reporting** | Produces Markdown performance reports and attempts PDF export. |
+| ⚙️ **Configuration-driven execution** | Centralizes pipeline behavior in YAML configuration. |
 
 ---
 
-# 📏 Experiment Evaluation
+## 🏗️ Architecture
 
-The evaluation layer provides:
-
-- **MAE**
-- **MSE**
-- **RMSE**
-- **MAPE**
-
-The scoring engine also validates that actual and predicted series have compatible lengths and matching temporal indexes before evaluation. 
-This is important for research because a metric should not silently compare misaligned temporal observations.
-
----
-
-# 📊 Visualization & Diagnostics
-
-The visualization layer is responsible for generating research-oriented plots rather than only producing final forecast charts.
-
-The repository currently contains examples including:
-
-- Time-series line plots
-- Seasonal plots
-- Decomposition plots
-- Envelope analysis
-- Forecast vs. actual plots
-- SARIMA fitting diagnostics
-- ACF/PACF diagnostics
-- Holt-Winters exploration
-
-The `Visualizer` is designed around time-series-aware plotting, including frequency-aware temporal axes and diagnostic visualization.
-
-For example, ACF and PACF are generated together to investigate temporal correlation structure.
-
----
-
-# 🖥️ Interactive Research Interface
-
-The project includes a **Gradio-based interactive research workspace**.
-
-The interface is divided conceptually into two research modes:
-
-### ⚡ Batch Experimentation
-
-Run the registered forecasting models against a dataset and compare their out-of-sample performance.
-
-### 🧪 Interactive Experiment Sandbox
-
-Experiment with individual model configurations and inspect their resulting diagnostics.
-
-The Gradio application wires dedicated experiment controls for:
-
-- Classical decomposition
-- Holt-Winters
-- SARIMA
-
-
-
-The application launches on port `7860` when `gradio_app.py` is executed directly.
-
----
-
-# 📄 Research Reports
-
-Experiment results can be transformed into an executive-style Markdown report and exported to PDF.
-
-The generated report can include:
-
-- Dataset information
-- Target and index configuration
-- Validation split
-- Model hyperparameters
-- Comparative metrics
-- Forecast visualizations
-- Stationarity diagnostics
-- ACF/PACF analysis
-- Conclusions and recommendations
-
-
-
-This makes the experiment easier to communicate beyond the Python environment.
-
----
-
-# 🏗️ Architecture
+The project is organized around a small set of focused layers rather than putting the entire experiment inside a single script.
 
 ```mermaid
 flowchart TD
+    A["📄 YAML Configuration"] --> B["⚙️ Config Layer"]
+    C["📊 CSV / Excel / Parquet"] --> D["📥 DataClass"]
+    B --> D
 
-    A[Researcher] --> B[Configuration]
-    A --> C[Interactive Gradio UI]
-    A --> D[Notebooks]
+    D --> E["🔬 Diagnostics"]
+    D --> F["📈 Visualizer"]
+    D --> G["🤖 Experiment Orchestrator"]
 
-    B --> E[Experiment Orchestrator]
-    C --> E
-    D --> E
+    G --> H["Decomposition"]
+    G --> I["Holt-Winters"]
+    G --> J["SARIMA"]
 
-    E --> F[Data Layer]
-    E --> G[Model Registry]
-    E --> H[Scoring Engine]
-    E --> I[Visualizer]
-
-    F --> J[Train / Test Data]
-
-    G --> K[Classical Decomposition]
-    G --> L[Holt-Winters]
-    G --> M[SARIMA]
-
+    H --> K["📏 ScoringEngine"]
+    I --> K
     J --> K
-    J --> L
-    J --> M
 
-    K --> N[Forecasts]
-    L --> N
-    M --> N
+    K --> L["📊 Metrics"]
+    F --> M["🖼️ Plot Artifacts"]
 
-    N --> H
-    H --> O[MAE / MSE / RMSE / MAPE]
+    G --> N["📝 Performance Results"]
+    N --> O["Markdown Report"]
+    N --> P["PDF Export"]
 
-    J --> P[Diagnostics]
-    P --> Q[ADF / KPSS]
-    P --> R[Decomposition]
-    P --> S[ACF / PACF]
-
-    O --> T[Research Results]
-    Q --> T
-    R --> T
-    S --> T
-    I --> T
-
-    T --> U[Plots]
-    T --> V[Executive Report]
-    V --> W[PDF]
+    Q["🌐 Gradio UI"] --> D
+    Q --> E
+    Q --> F
+    Q --> G
 ```
 
-The core orchestrator explicitly coordinates data ingestion, model execution, scoring, and visualization.
+### 🔄 Batch pipeline
+
+`main.py` coordinates the headless workflow:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Main as main.py
+    participant Config
+    participant Data as DataClass
+    participant Viz as Visualizer
+    participant Diag as Diagnostics
+    participant Orch as Orchestrator
+    participant Models
+    participant Score as ScoringEngine
+    participant Report
+
+    User->>Main: python main.py cli --config ...
+    Main->>Config: Load YAML
+    Main->>Data: Ingest dataset
+    Main->>Viz: Generate initial plots
+    Main->>Diag: Run stationarity analysis
+    Main->>Orch: Run registered models
+
+    loop Each registered model
+        Orch->>Models: Fit
+        Models-->>Orch: Forecast
+        Orch->>Score: Evaluate
+        Score-->>Orch: Metrics
+        Orch->>Viz: Generate prediction plot
+    end
+
+    Main->>Report: Build Markdown report
+    Main->>Report: Attempt PDF export
+    Report-->>User: reports/*
+```
 
 ---
 
-# 🧩 Project Structure
+## 📦 Project Structure
 
 ```text
-..
+TIME_SERIES_LAB/
 ├── configs/
-│   ├── config.yaml               # Model, data, scoring, and visualization configurations
-│   └── logging.yaml              # Logging infrastructure configuration manifest
-├── data/                         # File directory for raw time series datasets
-├── logs/                         # File logging output directory
-├── notebooks/                    # Exploratory data analysis & development notebooks
+│   ├── example.yaml          # Example pipeline configuration
+│   └── logging.yaml          # Logging configuration
+│
+├── notebooks/
 │   ├── data_preprocessing.ipynb
 │   └── dev.ipynb
-├── plots/                        # Rendered visual asset cache directory
-├── reports/                      # Generated executive performance PDF reports
-├── src/                          # Core source codebase
-│   ├── config.py                 # Dataclass schemas and YAML configuration loader
-│   ├── data.py                   # Ingestion, validation, and train/test partition loader
-│   ├── diagnostics.py            # ADF/KPSS stationarity tests & fit calculations
-│   ├── gradio_app.py             # Gradio web UI layout builder and event handlers
-│   ├── logger.py                 # Logging initialization utility
-│   ├── metrics.py                # Vectorized error evaluation math engine (MAE, MSE, RMSE, MAPE)
-│   ├── models.py                 # Model wrappers (Decomposition, Holt-Winters, SARIMA)
-│   ├── orchestrator.py           # Experiment orchestrator & pipeline execution engine
-│   └── visualizer.py             # Matplotlib visualizer and time series plot engine
-├── tests/                        # Automated unit tests directory
+│
+├── src/
+│   ├── __init__.py
+│   ├── app.py                # Gradio UI + report helpers
+│   ├── config.py             # Configuration dataclasses/YAML loading
+│   ├── data.py               # Data ingestion and train/test splitting
+│   ├── diagnostics.py        # ADF, KPSS and decomposition diagnostics
+│   ├── logger.py             # Logging setup
+│   ├── metrics.py            # Forecast evaluation metrics
+│   ├── models.py             # Forecasting model implementations
+│   ├── orchestrator.py       # Model registry and experiment execution
+│   └── visualizer.py         # Plot generation
+│
+├── tests/
 │   ├── test_data.py
 │   └── test_visualization.py
-├── main.py                       # CLI execution entry point
-├── pyproject.toml                # Project dependency configuration
-├── tasks.md                      # Development roadmap and tracking tasks
+│
+├── main.py                   # Application entry point
+├── pyproject.toml            # Project metadata and dependencies
+├── LICENSE
 └── README.md
 ```
 
 ---
 
-# 🔧 Configuration-Driven Experiments
+## 💻 Requirements
 
-Experiment configuration is centralized rather than hard-coded throughout the execution pipeline.
+The project declares:
 
-The configuration schema covers:
+- 🐍 **Python 3.12 or newer**
+- 📦 **uv** for project/environment management
+- 🌐 Internet access during the initial dependency installation
+- 🗂️ A supported dataset when running the configured pipeline
 
-- Dataset path
-- Train/test split
-- Datetime index
-- Visualization settings
-- Decomposition settings
-- Holt-Winters settings
-- SARIMA parameters
-- Evaluation metrics
+### Why `uv`?
 
+This repository uses `uv` instead of asking contributors to manually manage `pip`, virtual environments, and dependency installation.
 
+The project declares its dependencies in `pyproject.toml`; `uv` can create/manage the project environment and install those declared dependencies.
 
-For example, the model configuration schema exposes SARIMA parameters:
-
-```yaml
-models:
-  sarima:
-    p: 1
-    d: 0
-    q: 1
-    P: 0
-    D: 0
-    Q: 0
-    s: null
-```
-
-> **Note:** The exact contents of the repository's `configs/config.yaml` should be treated as the source of truth. The example above reflects the configuration schema implemented in `src/config.py`, not a claim about the current YAML file contents.
+> [!TIP]
+> You do **not** need to manually create a traditional `venv` before using the project workflow described below.
 
 ---
 
-# 💻 Installation
+# ⚡ Installation
 
-## Prerequisites
+Choose your operating system and follow **only that section**.
 
-Before starting, install:
+> [!NOTE]
+> The commands below are intentionally platform-specific. Do not copy a Windows PowerShell command into Bash, or a Bash activation command into PowerShell.
 
-| Requirement | Purpose |
-|---|---|
-| 🐍 Python 3.12+ | Runtime |
-| 🔧 Git | Clone the repository |
-| 📦 pip | Install Python dependencies |
-| 🌐 Modern browser | Access the Gradio interface |
-
-The supplied project sources are written against Python 3.12-era environments.
-
----
-
-## 🪟 Windows
+## Windows
 
 ### 1. Install Git
 
 Install Git for Windows from:
 
-https://git-scm.com/download/win
+- https://git-scm.com/download/win
 
 Verify:
 
@@ -460,135 +283,106 @@ Verify:
 git --version
 ```
 
-### 2. Install Python
+### 2. Install `uv`
 
-Install Python from:
-
-https://www.python.org/downloads/
-
-During installation, enable:
-
-> **Add Python to PATH**
-
-Verify:
+Open **PowerShell** and run:
 
 ```powershell
-python --version
-pip --version
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Close and reopen PowerShell after installation, then verify:
+
+```powershell
+uv --version
 ```
 
 ### 3. Clone the repository
 
+
 ```powershell
-git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB
+git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB.git
 cd TIME_SERIES_LAB
 ```
 
-
-### 4. Create a virtual environment
-
-```powershell
-python -m venv .venv
-```
-
-### 5. Activate it
+### 4. Install the project environment and dependencies
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+uv sync
 ```
 
-If PowerShell blocks activation because of execution policy, use:
+### 5. Verify Python
 
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+uv run python --version
 ```
 
-Then activate again:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-### 6. Install the project
-
-Because the repository contains `pyproject.toml`, the preferred installation path is:
-
-```powershell
-python -m pip install --upgrade pip
-python -m pip install -e .
-```
-
+You should have Python `3.12+`.
 
 ---
 
-## 🍎 macOS
+## macOS
 
 ### 1. Install Git
 
-macOS may provide Git through Apple's developer tools.
-
-Verify:
+First verify whether Git is available:
 
 ```bash
 git --version
 ```
 
-If Git is not installed:
+If Git is not installed, macOS may offer to install the Xcode Command Line Tools.
+
+Alternatively, install Git from:
+
+- https://git-scm.com/download/mac
+
+### 2. Install `uv`
+
+Open Terminal and run:
 
 ```bash
-xcode-select --install
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### 2. Install Python
-
-Install Python 3.12+ from:
-
-https://www.python.org/downloads/macos/
-
-Verify:
+Restart your terminal, then verify:
 
 ```bash
-python3 --version
-python3 -m pip --version
+uv --version
 ```
 
 ### 3. Clone the repository
 
 ```bash
-git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB
+git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB.git
 cd TIME_SERIES_LAB
 ```
 
-### 4. Create a virtual environment
+### 4. Install the project environment and dependencies
 
 ```bash
-python3 -m venv .venv
+uv sync
 ```
 
-### 5. Activate it
+### 5. Verify Python
 
 ```bash
-source .venv/bin/activate
+uv run python --version
 ```
 
-### 6. Install the project
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -e .
-```
+You should have Python `3.12+`.
 
 ---
 
-## 🐧 Linux
+## Linux
 
 ### 1. Install Git
 
-For Debian/Ubuntu-based systems:
+On Debian/Ubuntu-based systems:
 
 ```bash
 sudo apt update
-sudo apt install git
+sudo apt install -y git
 ```
 
 Verify:
@@ -597,335 +391,373 @@ Verify:
 git --version
 ```
 
-### 2. Install Python
+For other Linux distributions, install Git using your distribution's package manager.
 
-Verify first:
+### 2. Install `uv`
+
+Open a terminal and run:
 
 ```bash
-python3 --version
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-If Python 3.12+ is already available, continue.
+Restart your terminal, then verify:
 
-Otherwise install an appropriate Python version for your Linux distribution.
+```bash
+uv --version
+```
+
+If `curl` is unavailable, the official `uv` documentation also provides alternative installation methods.
 
 ### 3. Clone the repository
 
 ```bash
-git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB
+git clone https://github.com/Ibraheem-Al-hafith/TIME_SERIES_LAB.git
 cd TIME_SERIES_LAB
 ```
 
-### 4. Create a virtual environment
+### 4. Install the project environment and dependencies
 
 ```bash
-python3 -m venv .venv
+uv sync
 ```
 
-If the `venv` module is missing on Debian/Ubuntu:
+### 5. Verify Python
 
 ```bash
-sudo apt install python3-venv
+uv run python --version
 ```
 
-Then create the environment again:
-
-```bash
-python3 -m venv .venv
-```
-
-### 5. Activate it
-
-```bash
-source .venv/bin/activate
-```
-
-### 6. Install the project
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -e .
-```
+You should have Python `3.12+`.
 
 ---
 
-# ▶️ Running the Research Interface
+## Verify the Installation
 
-The verified Gradio application can be launched directly with:
+From inside `TIME_SERIES_LAB`, run:
 
 ```bash
-python src/gradio_app.py
+uv run python -c "import pandas, numpy, scipy, statsmodels; print('Core dependencies loaded successfully.')"
 ```
 
-On Windows PowerShell:
+Then:
 
-```powershell
-python src\gradio_app.py
+```bash
+uv run pytest
 ```
 
-The application is configured to launch on:
+A successful test run confirms that the environment and the repository's automated tests can execute.
+
+---
+
+## 🧪 Run the Tests
+
+The project uses `pytest`.
+
+Run the complete test suite:
+
+```bash
+uv run pytest
+```
+
+Run with more verbose output:
+
+```bash
+uv run pytest -v
+```
+
+Run a specific test module:
+
+```bash
+uv run pytest tests/test_data.py
+```
+
+or:
+
+```bash
+uv run pytest tests/test_visualization.py
+```
+
+### Test configuration
+
+`pyproject.toml` configures pytest with:
+
+```toml
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+pythonpath = ["."]
+```
+
+This makes the repository root available on the Python path and tells pytest where the tests live.
+
+---
+
+# ▶️ Run the Application
+
+The main entry point is:
 
 ```text
-http://localhost:7860
+main.py
 ```
 
-The application source explicitly launches Gradio on port `7860`.
-
-Open the displayed local URL in your browser.
-
----
-
-# 🧪 Running an Experiment
-
-The research workflow is conceptually:
+The application exposes two execution modes:
 
 ```text
-1. Select / provide dataset
-        ↓
-2. Select target column
-        ↓
-3. Select temporal index
-        ↓
-4. Define validation split
-        ↓
-5. Investigate diagnostics
-        ↓
-6. Configure forecasting model
-        ↓
-7. Run experiment
-        ↓
-8. Inspect forecast
-        ↓
-9. Compare metrics
-        ↓
-10. Interpret the result
+main.py
+├── cli    → headless batch pipeline
+└── ui     → interactive Gradio interface
 ```
 
-The interactive application supports dataset ingestion and exposes model-specific experiment controls for decomposition, Holt-Winters, and SARIMA. 
----
 
-# 🔍 Understanding the Experiment Pipeline
+## 1. Headless CLI Pipeline
 
-For a single model experiment, the system performs:
+### Step 1 — Prepare your configuration
+
+Start from:
 
 ```text
-Dataset
-   │
-   ▼
-Train/Test Split
-   │
-   ▼
-Model Registry
-   │
-   ▼
-Model Construction
-   │
-   ▼
-Fit on Training Data
-   │
-   ▼
-Forecast Test Horizon
-   │
-   ▼
-Align Predictions + Actuals
-   │
-   ▼
-Calculate Metrics
-   │
-   ▼
-Generate Validation Visualization
-   │
-   ▼
-Research Result
+configs/example.yaml
 ```
 
-The orchestrator follows this sequence explicitly: it retrieves the train/test partitions, constructs the selected model, fits it, forecasts the test horizon, evaluates predictions, and generates a prediction-vs-actual visualization.
-
----
-
-# 🧪 Running All Registered Models
-
-The experiment orchestrator also provides a batch comparison workflow.
-
-Conceptually:
+Copy it to your own configuration file:
 
 ```text
-                 Dataset
-                    │
-       ┌────────────┼────────────┐
-       ▼            ▼            ▼
- Decomposition  Holt-Winters   SARIMA
-       │            │            │
-       ▼            ▼            ▼
-    Forecast     Forecast     Forecast
-       │            │            │
-       └────────────┼────────────┘
-                    ▼
-             Metric Evaluation
-                    │
-                    ▼
-          Comparative Results
+configs/config.yaml
 ```
 
-The batch runner isolates model failures so that an error in one experiment does not automatically terminate the entire comparison.
+Then edit the dataset settings:
 
-This is particularly useful for research because it makes **model comparison a first-class experiment rather than a collection of manually executed scripts**.
+```yaml
+data:
+  path: "data/raw/monthly_sales.csv"
+  split_size: 120
+  index_col: "Date"
+  target: "Sales"
+```
+
+Update these values to match your real dataset.
+
+### Step 2 — Run the pipeline
+
+```bash
+uv run python main.py cli --config configs/config.yaml
+```
+
+The pipeline performs the following high-level operations:
+
+1. 📥 Loads the configured dataset.
+2. ✂️ Creates train/test splits.
+3. 📈 Generates initial visualizations.
+4. 🔬 Runs stationarity diagnostics.
+5. 🤖 Runs the registered forecasting models.
+6. 📏 Calculates configured evaluation metrics.
+7. 📊 Generates prediction visualizations.
+8. 📝 Writes a Markdown performance report.
+9. 📄 Attempts PDF report generation.
+
+### Expected output locations
+
+The exact plot filenames depend on the selected target and visualization methods, but the configured output directories include:
+
+```text
+plots/
+reports/
+```
+
+The batch pipeline writes:
+
+```text
+reports/performance_report.md
+reports/performance_report.pdf
+```
+
+The PDF is attempted conditionally and may not be produced if PDF rendering fails.
 
 ---
 
-# 📐 Diagnostics as Research Evidence
+## 2. Interactive Gradio UI
 
-The system intentionally separates **forecasting performance** from **statistical evidence**.
+Launch the interactive web interface with:
+
+```bash
+uv run python main.py ui
+```
+
+The application is configured to listen on:
+
+```text
+http://127.0.0.1:7860
+```
+
+> [!NOTE]
+> The source configures Gradio with `server_name="0.0.0.0"` and `server_port=7860`. Open `http://127.0.0.1:7860` in your local browser.
+
+The UI provides interactive workflows around:
+
+- 📥 Dataset upload
+- 🎯 Target/index selection
+- 📈 Visualization
+- 🔬 Decomposition and stationarity diagnostics
+- 🤖 Model experimentation
+- 📊 Comparative evaluation
+
+---
+
+# ⚙️ Configuration
+
+The primary configuration model is defined in `src/config.py`, while an example YAML configuration is provided in:
+
+```text
+configs/example.yaml
+```
+
+A simplified configuration looks like:
+
+```yaml
+name: "time_series_forecasting_pipeline"
+
+data:
+  path: "data/raw/monthly_sales.csv"
+  split_size: 120
+  index_col: "Date"
+  target: "Sales"
+
+visualizer:
+  plot_path: "plots"
+  decomposition_model: "additive"
+  style_theme: "seaborn-v0_8-whitegrid"
+  dpi: 150
+  acf_lags: 40
+  max_time_ticks: 15
+
+models:
+  decompose:
+    model: "additive"
+    period: 12
+
+  exponential_smoothing:
+    trend: "add"
+    seasonal: "add"
+    seasonal_periods: 12
+
+  sarima:
+    p: 1
+    d: 1
+    q: 1
+    P: 1
+    D: 1
+    Q: 1
+    s: 12
+
+scoring:
+  mae: true
+  mse: true
+  rmse: true
+  mape: true
+  epsilon: 0.00001
+```
+
+## Configuration sections
+
+| Section | Responsibility |
+|---|---|
+| `data` | Dataset path, split boundary, index column, target column |
+| `visualizer` | Plot output path, style, resolution, seasonal/decomposition visualization settings |
+| `models.decompose` | Classical decomposition settings |
+| `models.exponential_smoothing` | Holt-Winters settings |
+| `models.sarima` | SARIMA orders and seasonal period |
+| `scoring` | Metric switches and MAPE zero-protection behavior |
+
+<details>
+<summary>🔍 What does <code>split_size</code> mean?</summary>
+
+`split_size` is the row boundary used by the data layer to divide observations into training and test sets.
 
 For example:
 
-```text
-                  Time Series
-                       │
-          ┌────────────┼────────────┐
-          ▼            ▼            ▼
-     Stationarity   Seasonality   Correlation
-          │            │            │
-       ADF/KPSS    Decomposition   ACF/PACF
-          │            │            │
-          └────────────┼────────────┘
-                       ▼
-               Model Selection
-                       │
-                       ▼
-                  Forecasting
+```yaml
+split_size: 120
 ```
 
-This allows researchers to investigate *why* a model might be appropriate instead of evaluating models solely by their final error scores.
+means the first 120 observations are assigned to training and the remaining observations are assigned to the evaluation/test portion.
+
+</details>
+
+<details>
+<summary>🧮 What does <code>epsilon</code> do?</summary>
+
+MAPE divides by the actual target value. True zero values therefore create a mathematical domain problem.
+
+The scoring layer supports an optional `epsilon`:
+
+```yaml
+epsilon: 0.00001
+```
+
+When configured, zero actual values are replaced by that small floor value for the MAPE calculation.
+
+If `epsilon` is `null` and true zeros exist, MAPE raises a `MathematicalDomainError`.
+
+</details>
 
 ---
 
-# 📊 Evaluation Metrics
+# 📊 Input Data
 
-The project currently supports four configurable metrics:
-
-| Metric | Meaning |
-|---|---|
-| **MAE** | Mean Absolute Error |
-| **MSE** | Mean Squared Error |
-| **RMSE** | Root Mean Squared Error |
-| **MAPE** | Mean Absolute Percentage Error |
-
-MAPE has explicit zero-value handling: by default, true zero targets raise a mathematical-domain error unless an `epsilon` correction is configured.
-
-This behavior is intentional: silently producing misleading percentage errors can be worse than explicitly stopping the experiment.
-
----
-
-# 📓 Notebooks
-
-The repository also contains exploratory notebooks:
+The data layer documents support for:
 
 ```text
-notebooks/
-├── data_preprocessing.ipynb
-└── dev.ipynb
+.csv
+.xlsx
+.parquet
 ```
 
-The notebooks complement the reusable pipeline:
+A typical time-series dataset may look like:
 
-> **Notebooks are for exploration and investigation; the `src/` modules provide reusable experiment infrastructure.**
+```csv
+Date,Sales,Temperature
+2026-01-01,1200,24.2
+2026-02-01,1275,25.1
+2026-03-01,1310,27.3
+2026-04-01,1290,29.0
+```
 
-This separation helps prevent the research workflow from becoming entirely dependent on one-off notebook cells.
+Configure the corresponding columns:
+
+```yaml
+data:
+  path: "data/raw/monthly_sales.csv"
+  index_col: "Date"
+  target: "Sales"
+  split_size: 120
+```
+
+### Important data-layer behavior
+
+The tests verify that the data layer:
+
+- loads supported datasets;
+- creates train/test partitions;
+- converts a configured datetime index;
+- reports a missing index column through logging and falls back to sequential indexing;
+- raises `FileNotFoundError` for missing files;
+- raises `ValueError` for unsupported extensions.
 
 ---
 
-# 🧱 Core Modules
+# 🤖 Forecasting Models
 
-| Module | Responsibility |
-|---|---|
-| `config.py` | Typed experiment configuration |
-| `data.py` | Data ingestion and train/test splitting |
-| `diagnostics.py` | Statistical diagnostics and model fitting helpers |
-| `models.py` | Forecasting model implementations |
-| `metrics.py` | Forecast evaluation |
-| `orchestrator.py` | End-to-end experiment execution |
-| `visualizer.py` | Research visualization |
-| `gradio_app.py` | Interactive research interface |
-| `logger.py` | Logging infrastructure |
+The model registry currently exposes three model identifiers:
 
-The configuration module uses typed dataclasses to represent experiment settings. The data module encapsulates ingestion and splitting, while the logging layer loads its behavior from YAML configuration. 
----
+| Registry key | Model | Core approach |
+|---|---|---|
+| `decompose` | Classical decomposition | Trend projection + seasonal pattern |
+| `exponential_smoothing` | Holt-Winters | Exponential smoothing with trend/seasonality |
+| `sarima` | SARIMA | Seasonal autoregressive integrated moving-average model |
 
-# 🧪 Testing
-
-Tests are located under:
-
-```text
-tests/
-├── test_data.py
-└── test_visualization.py
-```
-
-Run the test suite with:
-
-```bash
-python -m pytest
-```
-
-> The repository tree confirms the presence of these test modules. The exact currently passing test count is intentionally not documented here because no test execution result was supplied.
-
----
-
-# 🛠️ Development Workflow
-
-A typical research/development cycle looks like:
-
-```text
-┌───────────────────────┐
-│ Define Research Idea  │
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Prepare Configuration │
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Run Diagnostics       │
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Run Model Experiments │
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Compare Metrics       │
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Inspect Visuals       │
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Interpret Results     │
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Document Finding      │
-└───────────────────────┘
-```
-
----
-
-# 🔌 Extending the Research Lab
-
-The architecture is designed around a model abstraction and registry.
-
-The forecasting layer defines a common `BaseModel` contract around:
-
-```text
-fit(...)
-predict(...)
-```
-
-while concrete implementations provide individual forecasting strategies.
-
-The orchestrator then resolves models through the registry:
+The registry is defined in `src/orchestrator.py`:
 
 ```python
 MODEL_REGISTRY = {
@@ -935,268 +767,392 @@ MODEL_REGISTRY = {
 }
 ```
 
+### 🧩 Model interface
 
-
-This creates a natural extension point for future research models.
-
-A new forecasting strategy can conceptually become:
+The forecasting classes share a common abstraction:
 
 ```text
-New Research Model
-       │
-       ▼
-Implement BaseModel contract
-       │
-       ▼
-Add configuration schema
-       │
-       ▼
-Register model
-       │
-       ▼
-Run through existing pipeline
-       │
-       ├── Evaluation
-       ├── Visualization
-       └── Comparison
+BaseModel
+├── fit(...)
+└── predict(...)
+
+    ├── DecompositionModel
+    ├── ExponentialSmoothingModel
+    └── SARIMAModel
 ```
 
-The important architectural principle is that **research infrastructure should not need to be rewritten every time a new forecasting hypothesis is tested.**
+This makes the orchestration layer independent of the concrete forecasting implementation.
 
 ---
 
-# ⚙️ Configuration Architecture
+# 🔬 Diagnostics
 
-The configuration system separates concerns:
+The diagnostics layer provides statistical analysis intended to help understand the behavior of a time series before or alongside forecasting.
+
+## Stationarity
+
+The project combines:
+
+- **ADF — Augmented Dickey-Fuller**
+- **KPSS — Kwiatkowski-Phillips-Schmidt-Shin**
+
+The combined diagnostic can classify the series into categories such as:
 
 ```text
-configs/
-│
-├── config.yaml
-│      │
-│      ├── Data
-│      ├── Visualization
-│      ├── Models
-│      │     ├── Decomposition
-│      │     ├── Holt-Winters
-│      │     └── SARIMA
-│      │
-│      └── Scoring
-│
-└── logging.yaml
-       │
-       └── Logging infrastructure
+                    ADF stationary?
+                    ┌───────┴───────┐
+                   YES              NO
+                    │                │
+              KPSS stationary?  KPSS stationary?
+                 /     \            /     \
+               YES     NO         YES      NO
+                │       │          │        │
+             Strict   Difference  Trend    Non-
+             Stationary Stationary Stationary Stationary
 ```
 
-The configuration loader converts YAML data into typed configuration objects using dataclasses and `dacite`. 
+The public diagnostic API includes:
+
+```python
+calculate_stationarity(...)
+generate_stationarity_report(...)
+fit_decomposition(...)
+```
+
 ---
 
-# 📝 Research Reports
+# 📏 Evaluation Metrics
 
-The application can produce an executive report containing:
+The scoring layer currently supports:
+
+| Metric | Meaning |
+|---|---|
+| **MAE** | Mean Absolute Error |
+| **MSE** | Mean Squared Error |
+| **RMSE** | Root Mean Squared Error |
+| **MAPE** | Mean Absolute Percentage Error |
+
+Before scoring, `ScoringEngine` validates:
+
+1. Prediction and actual lengths.
+2. Exact index alignment.
+3. Missing values.
+4. Non-empty sanitized evaluation arrays.
+
+This is important for time-series evaluation because predictions must correspond to the same temporal observations as the ground truth.
+
+---
+
+# 📈 Visualizations & Outputs
+
+The `Visualizer` class is responsible for generating graphical artifacts.
+
+The source currently includes visualization workflows for areas such as:
+
+- 📈 line-series visualization
+- 📦 envelope/component analysis
+- 🔄 seasonal plots
+- 🧩 seasonal decomposition
+- 🎯 predictions vs. actuals
+- 📐 in-sample fitting
+- 📊 diagnostic plots
+
+Generated plots are written to the configured visualization directory.
+
+Example:
+
+```yaml
+visualizer:
+  plot_path: "plots"
+```
+
+---
+
+# 📓 Notebooks
+
+Two notebooks are included for exploratory/development work:
+
+```text
+notebooks/
+├── data_preprocessing.ipynb
+└── dev.ipynb
+```
+
+Use notebooks for experimentation and investigation; keep reusable production behavior in `src/`.
+
+---
+
+# 🧩 Codebase Map
+
+| File | Responsibility |
+|---|---|
+| `main.py` | CLI/UI entry point and batch pipeline |
+| `src/app.py` | Gradio presentation layer and report helpers |
+| `src/config.py` | Configuration dataclasses and YAML loading |
+| `src/data.py` | Dataset loading and train/test management |
+| `src/diagnostics.py` | Statistical diagnostics and decomposition analysis |
+| `src/logger.py` | Logging configuration |
+| `src/metrics.py` | Numerical metrics and scoring engine |
+| `src/models.py` | Forecasting model abstractions and implementations |
+| `src/orchestrator.py` | Model registry and experiment coordination |
+| `src/visualizer.py` | Plot lifecycle and visualization generation |
+| `tests/test_data.py` | Data-layer tests |
+| `tests/test_visualization.py` | Visualization tests |
+
+### 🧠 Dependency direction
+
+```mermaid
+graph LR
+    Main["main.py"] --> Config["config.py"]
+    Main --> Data["data.py"]
+    Main --> Diagnostics["diagnostics.py"]
+    Main --> Orchestrator["orchestrator.py"]
+    Main --> Visualizer["visualizer.py"]
+    Main --> App["app.py"]
+
+    Orchestrator --> Data
+    Orchestrator --> Models["models.py"]
+    Orchestrator --> Metrics["metrics.py"]
+    Orchestrator --> Visualizer
+
+    App --> Data
+    App --> Diagnostics
+    App --> Models
+    App --> Orchestrator
+    App --> Visualizer
+
+    Models --> Config
+    Models --> Data
+    Visualizer --> Config
+    Visualizer --> Data
+    Metrics --> Config
+    Diagnostics --> Data
+```
+
+---
+
+# 🛠️ Development Workflow
+
+A simple contributor workflow is:
+
+```text
+1. Clone
+   ↓
+2. Install with uv
+   ↓
+3. Run tests
+   ↓
+4. Create/update configuration
+   ↓
+5. Run CLI or UI
+   ↓
+6. Inspect plots/reports
+   ↓
+7. Make changes
+   ↓
+8. Run tests again
+```
+
+### Recommended commands
+
+```bash
+# Install/synchronize dependencies
+uv sync
+
+# Run tests
+uv run pytest
+
+# Run the CLI pipeline
+uv run python main.py cli --config configs/config.yaml
+
+# Run the interactive UI
+uv run python main.py ui
+```
+
+### Dependency maintenance
+
+The repository intentionally uses `uv` as its Python project/dependency workflow.
+
+The dependency source of truth currently lives in:
+
+```text
+pyproject.toml
+```
+
+When dependency management is changed, keep the project metadata and development instructions synchronized.
+
+> [!NOTE]
+> A future repository-level `Makefile` can wrap the common setup, test, and run commands to reduce the number of commands new contributors need to remember. It is intentionally not documented as an existing command until that file is actually added.
+
+---
+
+# 🔎 Troubleshooting
 
 <details>
-<summary>📄 Report contents</summary>
+<summary>❌ <code>uv: command not found</code> / <code>uv is not recognized</code></summary>
 
-### Executive Summary
+Restart your terminal after installing `uv`.
 
-Identifies the best-performing model according to the available primary metric.
+Then verify:
 
-### Dataset Configuration
+```bash
+uv --version
+```
 
-Records:
+On Windows PowerShell, close and reopen the PowerShell session.
 
-- Source dataset
-- Target variable
-- Temporal index
-- Validation split
-
-### Model Configuration
-
-Records the parameters used by:
-
-- Classical decomposition
-- Holt-Winters
-- SARIMA
-
-### Experimental Results
-
-Provides comparative evaluation metrics.
-
-### Diagnostics
-
-Includes:
-
-- Stationarity analysis
-- ADF results
-- ACF/PACF analysis
-- Model-specific observations
-
-### Conclusions
-
-Summarizes model trade-offs and the selected result.
+If the command is still unavailable, consult the official `uv` installation documentation.
 
 </details>
 
-The report generator is implemented directly in the Gradio application and can also export the Markdown report to PDF.
+<details>
+<summary>❌ Python version is too old</summary>
 
----
+The project requires Python:
 
-# ⚠️ Important Research Considerations
+```text
+>= 3.12
+```
 
-This project is intended to **assist research**, not replace statistical reasoning.
+Check:
 
-A lower forecasting error does not automatically prove that a model is theoretically superior.
+```bash
+uv run python --version
+```
 
-Researchers should consider:
+`uv` can manage Python installations as part of its workflow, so prefer using the `uv` project commands rather than manually mixing several Python installations.
 
-- temporal leakage
-- appropriate validation horizons
-- stationarity assumptions
-- seasonal structure
-- data quality
-- metric suitability
-- model assumptions
-- residual behavior
-- statistical significance
-- domain-specific interpretation
+</details>
 
-The purpose of this laboratory is to reduce **implementation overhead**, not to automate scientific judgment.
+<details>
+<summary>❌ Configuration file not found</summary>
 
----
+The CLI requires a valid YAML configuration path.
 
-# 🗺️ Current Scope
+Use:
 
-### Currently implemented
+```bash
+uv run python main.py cli --config configs/config.yaml
+```
 
-- [x] Configuration-driven experiments
-- [x] CSV ingestion
-- [x] Excel ingestion
-- [x] Parquet ingestion
-- [x] Train/test splitting
-- [x] ADF diagnostics
-- [x] KPSS diagnostics
-- [x] Classical decomposition
-- [x] Holt-Winters exponential smoothing
-- [x] SARIMA
-- [x] MAE
-- [x] MSE
-- [x] RMSE
-- [x] MAPE
-- [x] Time-series visualization
-- [x] ACF/PACF visualization
-- [x] Interactive Gradio workspace
-- [x] Batch model comparison
-- [x] Markdown experiment reporting
-- [x] PDF report generation
-- [x] Logging infrastructure
-- [x] Automated tests
+and confirm that the file exists:
+
+```text
+configs/config.yaml
+```
+
+</details>
+
+<details>
+<summary>❌ Dataset file not found</summary>
+
+Check the path in your YAML:
+
+```yaml
+data:
+  path: "data/raw/monthly_sales.csv"
+```
+
+The path is interpreted relative to the directory from which the application is launched.
+
+</details>
+
+<details>
+<summary>❌ MAPE fails because the dataset contains zero values</summary>
+
+Configure an epsilon value:
+
+```yaml
+scoring:
+  mape: true
+  epsilon: 0.00001
+```
+
+If you deliberately want zero targets to be treated as an error, leave `epsilon` unset/null.
+
+</details>
+
+<details>
+<summary>❌ PDF report is not generated</summary>
+
+The batch pipeline treats PDF generation as an optional/gracefully isolated step.
+
+Check the terminal logs. The Markdown report should still be written to:
+
+```text
+reports/performance_report.md
+```
+
+</details>
 
 ---
 
 # 🤝 Contributing
 
-Contributions are welcome, particularly contributions that improve the project's value as a **research experimentation platform**.
+Contributions should preserve the project's core principles:
 
-Potential contribution areas include:
+- 🧩 Keep responsibilities separated by module.
+- 🧪 Add or update tests when behavior changes.
+- ⚙️ Keep configuration behavior explicit.
+- 📏 Preserve input alignment and validation in metric calculations.
+- 📚 Keep documentation synchronized with actual commands and source behavior.
+- 🚫 Do not commit credentials, API keys, private datasets, or generated secrets.
+- 🔍 Prefer small, reviewable changes.
 
-- New forecasting models
-- New statistical diagnostics
-- Better experiment comparison
-- Additional evaluation metrics
-- New visualization techniques
-- Dataset adapters
-- Research-oriented reporting
-- Test coverage
-- Documentation
+Before submitting a change:
 
-When adding a new model, prefer extending the existing model abstraction and registry rather than introducing an independent execution path.
+```bash
+uv sync
+uv run pytest
+```
+
+For larger architectural changes, document the reason and expected impact in the pull request.
 
 ---
 
 # 📜 License
 
-This project includes a `LICENSE` file in the repository.
+This project contains a `LICENSE` file in the repository.
 
-Please consult [`LICENSE`](LICENSE) for the authoritative licensing terms.
-
----
-
-# 🔭 Vision
-
-The long-term vision is to evolve this project from a collection of forecasting utilities into a reusable **research laboratory for systematic time-series experimentation**.
-
-The guiding principle remains:
-
-> ### 🧠 Less implementation overhead. More scientific investigation.
-
-A researcher should be able to spend less time rebuilding:
-
-```text
-data loading
-     +
-splitting
-     +
-model wrappers
-     +
-metrics
-     +
-plots
-     +
-reports
-```
-
-and more time asking:
-
-```text
-"What does the data tell us?"
-
-"Why does this model behave this way?"
-
-"Which assumptions are valid?"
-
-"Which hypothesis survives experimentation?"
-```
+The exact license terms should be read from that file rather than inferred from this README.
 
 ---
 
-## ⭐ Project Philosophy
+## 🗺️ Documentation Status
 
-```text
-                         RESEARCH
-                            ▲
-                            │
-                            │
-              ┌─────────────┴─────────────┐
-              │                           │
-        Statistical                  Experimental
-        Investigation                Comparison
-              │                           │
-              └─────────────┬─────────────┘
-                            │
-                            ▼
-                  ┌───────────────────┐
-                  │  TIME SERIES LAB  │
-                  └───────────────────┘
-                            │
-             ┌──────────────┼──────────────┐
-             ▼              ▼              ▼
-          Models       Diagnostics      Evaluation
-             │              │              │
-             └──────────────┼──────────────┘
-                            ▼
-                     Visual Evidence
-                            │
-                            ▼
-                    Research Findings
-```
-
-**The objective is not to hide the mathematics.**
-
-**The objective is to remove the repetitive engineering required to investigate it.**
+| Area | Status |
+|---|---|
+| Project overview | ✅ |
+| Architecture | ✅ |
+| Cross-platform setup | ✅ |
+| `uv` workflow | ✅ |
+| CLI usage | ✅ |
+| Gradio UI usage | ✅ |
+| Configuration | ✅ |
+| Data format | ✅ |
+| Models | ✅ |
+| Diagnostics | ✅ |
+| Metrics | ✅ |
+| Testing | ✅ |
+| Project structure | ✅ |
+| Troubleshooting | ✅ |
+| Demo media | 🟡 Placeholder |
+| Live demo | 🟡 Not supplied |
+| Screenshots | 🟡 Not supplied |
+| Repository URL | 🟡 Not supplied |
+| Makefile | 🟡 Planned separately |
 
 ---
+
+## ⭐ If This Project Helps You
+
+If this repository becomes public and useful to you, consider:
+
+- ⭐ starring the repository;
+- 🐛 opening an issue when you find a reproducible problem;
+- 💡 proposing improvements;
+- 🤝 contributing tests, documentation, or implementation improvements.
 
 <p align="center">
-  <strong>🔬 Build fewer experiment pipelines. Investigate more research questions.</strong>
+  <strong>📈 Turn time-series data into something you can inspect, test, forecast, and explain.</strong>
 </p>
