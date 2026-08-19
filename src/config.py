@@ -53,6 +53,7 @@ class VisualizationConfig:
     dpi: int = 150
     default_figsize: Tuple[int, int] = (14, 7)
     acf_lags: int = 40
+    max_time_ticks: int = 15
 
     '''
     @classmethod

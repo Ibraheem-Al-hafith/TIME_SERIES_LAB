@@ -107,10 +107,9 @@ def parse_csv_column_headers(file_obj: Any) -> Tuple[gr.Dropdown, gr.Dropdown]:
 # VISUALIZATION ADAPTERS
 # =====================================================================
 
-
-def handle_data_ingestion_visuals(
-    file_obj: Any, target_col: str, index_col: Optional[str], split_size: int, seasonal_period
-) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def handle_seasonal_plot_visuals(
+    file_obj: Any, target_col: str, index_col: Optional[str], split_size: int, seasonal_period: int
+) -> Optional[str]:
     """Adapter to construct DataClass and render ingestion overview and envelope plots.
 
     Args:
@@ -124,7 +123,36 @@ def handle_data_ingestion_visuals(
         Tuple[Optional[str], Optional[str]]: Paths to generated line plot and envelope plot.
     """
     if file_obj is None or not target_col:
-        return None, None, None
+        return None
+    if index_col == "None":
+        index_col = None
+    try:
+        dataset = build_dataset_instance(file_obj.name, target_col, index_col, int(split_size))
+        vis_cfg = VisualizationConfig(plot_path="plots/")
+        visualizer = Visualizer(dataset=dataset, config=vis_cfg)
+        seasonal_path = visualizer.plot_seasonal(target_col=target_col, period=seasonal_period)
+        return seasonal_path
+    except Exception as exc:
+        logger.error("Error generating ingestion visuals: %s", exc)
+        return None
+
+def handle_data_ingestion_visuals(
+    file_obj: Any, target_col: str, index_col: Optional[str], split_size: int
+) -> Tuple[Optional[str], Optional[str]]:
+    """Adapter to construct DataClass and render ingestion overview and envelope plots.
+
+    Args:
+        file_obj: Uploaded file object wrapper from Gradio.
+        target_col: Selected target column name.
+        index_col: Selected calendar index column name.
+        split_size: Split size parameter value.
+        seasonal_period: period of the seasonal period
+
+    Returns:
+        Tuple[Optional[str], Optional[str]]: Paths to generated line plot and envelope plot.
+    """
+    if file_obj is None or not target_col:
+        return None, None
     if index_col == "None":
         index_col = None
     try:
@@ -134,11 +162,10 @@ def handle_data_ingestion_visuals(
 
         line_path = visualizer.plot_line_series(target_col=target_col)
         envelope_path = visualizer.plot_envelope_components(target_col=target_col)
-        seasonal_path = visualizer.plot_seasonal(target_col=target_col, period=seasonal_period)
-        return line_path, envelope_path, seasonal_path
+        return line_path, envelope_path
     except Exception as exc:
         logger.error("Error generating ingestion visuals: %s", exc)
-        return None, None, None
+        return None, None
 
 
 # =====================================================================
@@ -559,7 +586,6 @@ def execute_ui_pipeline(
     target_col: str,
     index_col: str,
     split_size: int,
-    seasonality_period: int,
     model_choice: str,
     mae_flag: bool,
     mse_flag: bool,
@@ -632,7 +658,7 @@ def execute_ui_pipeline(
         )
 
         orchestrator = ExperimentOrchestrator(global_config=global_cfg)
-        line_path, envelope_path, _ = handle_data_ingestion_visuals(file_obj, target_col, index_col, split_size, seasonality_period)
+        line_path, envelope_path= handle_data_ingestion_visuals(file_obj, target_col, index_col, split_size)
 
         if model_choice == "Run All Models Sweep":
             run_output = orchestrator.run_all_models(target_column=target_col)
@@ -960,19 +986,23 @@ def build_gradio_interface() -> gr.Blocks:
             ingest_ui["target_column"],
             ingest_ui["index_column"],
             ingest_ui["split_size"],
-            ingest_ui['seasonality_period']
         ]
+
+        ingest_ui["seasonality_period"].change(
+            fn=handle_seasonal_plot_visuals,
+            inputs = ingestion_inputs+[ingest_ui["seasonality_period"]],
+            outputs = [ingest_ui["ingestion_seasonality_plot"]]
+        )
         for trigger_comp in [
             ingest_ui["file_input"],
             ingest_ui["target_column"],
             ingest_ui["index_column"],
             ingest_ui["split_size"],
-            ingest_ui['seasonality_period']
         ]:
             trigger_comp.change(
                 fn=handle_data_ingestion_visuals,
                 inputs=ingestion_inputs,
-                outputs=[ingest_ui["ingestion_line_plot"], ingest_ui["ingestion_envelope_plot"], ingest_ui["ingestion_seasonality_plot"]],
+                outputs=[ingest_ui["ingestion_line_plot"], ingest_ui["ingestion_envelope_plot"]],
             )
 
 
@@ -985,7 +1015,6 @@ def build_gradio_interface() -> gr.Blocks:
                 ingest_ui["target_column"],
                 ingest_ui["index_column"],
                 ingest_ui["split_size"],
-                ingest_ui["seasonality_period"],
                 batch_ui["batch_model_selector"],
                 batch_ui["mae_tgl"],
                 batch_ui["mse_tgl"],

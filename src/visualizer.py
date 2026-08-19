@@ -10,13 +10,14 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-from typing import Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 import matplotlib
 matplotlib.use("Agg")  # Ensure headless thread-safe execution
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+#import matplotlib.Ax
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
@@ -39,6 +40,10 @@ class Visualizer:
         """
         self._dataset = dataset
         self.config = config
+        #if self._dataset.config.index_col is not None:
+        #    self._dataset.data.index = pd.to_datetime(
+        #        self._dataset.data[self._dataset.config.index_col]
+        #    )
 
         if hasattr(self.config, "style_theme") and self.config.style_theme in plt.style.available:
             plt.style.use(self.config.style_theme)
@@ -98,83 +103,153 @@ class Visualizer:
 
         return False, target_path
 
+    @staticmethod
+    def _to_datetime_index(
+        index: Union[pd.Index, pd.DatetimeIndex, pd.PeriodIndex],
+    ) -> Optional[pd.DatetimeIndex]:
+        """Convert an index to a DatetimeIndex when it is genuinely datetime-like.
+
+        The conversion is intentionally conservative: an arbitrary string index is
+        not treated as time merely because ``pd.to_datetime`` can parse it. This
+        prevents categorical labels from accidentally receiving date formatting.
+        """
+        if isinstance(index, pd.PeriodIndex):
+            return index.to_timestamp()
+
+        if isinstance(index, pd.DatetimeIndex):
+            return index
+
+        if len(index) == 0:
+            return None
+
+        # Only infer datetime semantics for object/string indexes when most/all
+        # values parse successfully. Numeric indexes remain sequential axes.
+        if pd.api.types.is_object_dtype(index.dtype) or pd.api.types.is_string_dtype(
+            index.dtype
+        ):
+            parsed = pd.to_datetime(index, errors="coerce")
+            if parsed.notna().all():
+                return pd.DatetimeIndex(parsed)
+
+        return None
+
+    @staticmethod
+    def _select_tick_indices(length: int, max_ticks: int) -> np.ndarray:
+        """Return evenly distributed integer positions for a sequential axis."""
+        if length <= 0:
+            return np.array([], dtype=int)
+
+        if max_ticks < 2:
+            max_ticks = 2
+
+        tick_count = min(length, max_ticks)
+        return np.unique(np.linspace(0, length - 1, tick_count, dtype=int))
+
     def _configure_time_axis(
         self,
         ax: plt.Axes,
         index: Union[pd.Index, pd.DatetimeIndex, pd.PeriodIndex],
-        max_ticks: int = 15,
+        max_ticks: Optional[int] = None,
     ) -> None:
-        """Configures X-axis ticks using series frequency and index boundaries.
+        """Configure a readable and semantically meaningful x-axis.
 
-        Ensures that all data points remain rendered in the line plot while limiting
-        displayed tick labels to a clean, non-overlapping subset grounded strictly
-        in the dataset's actual time observations.
+        The previous implementation mixed frequency-specific locators with
+        observation counts. That can produce misleading tick positions for
+        irregular series and overly dense labels for long series.
 
-        Args:
-            ax: Target matplotlib axes instance.
-            index: Dataset time index containing actual observation labels.
-            max_ticks: Preferred maximum number of visible tick marks on the axis.
+        This implementation follows a simpler rule:
+
+        * Preserve the actual observation dates; never replace the time axis with
+          observation numbers for a datetime-like series.
+        * Let Matplotlib's ``AutoDateLocator`` choose calendar-aware tick
+          intervals from the visible time span.
+        * Use ``ConciseDateFormatter`` so repeated year/month information is
+          suppressed instead of printing verbose labels such as ``2024-01-01``
+          at every tick.
+        * For non-datetime indexes, place a bounded number of ticks at actual
+          observation positions and use the original labels.
         """
         if len(index) == 0:
             return
 
-        # Standardize PeriodIndex to DatetimeIndex where applicable
-        if isinstance(index, pd.PeriodIndex):
-            dt_index = index.to_timestamp()
-        elif isinstance(index, pd.DatetimeIndex):
-            dt_index = index
-        else:
-            # Attempt datetime conversion if string formatted
-            try:
-                dt_index = pd.to_datetime(index)
-            except Exception:
-                dt_index = None
+        tick_limit = max_ticks or getattr(self.config, "max_time_ticks", 8)
+        tick_limit = max(3, int(tick_limit))
 
-        total_obs = len(index)
+        dt_index = self._to_datetime_index(index)
 
-        # Case 1: Datetime Index - Frequency Aware Formatting
         if dt_index is not None and not dt_index.empty:
-            inferred_freq = dt_index.inferred_freq or getattr(dt_index, "freqstr", None)
+            # Sort only for axis analysis; the plotted series itself remains
+            # responsible for ordering its observations.
+            valid_dates = pd.DatetimeIndex(dt_index.dropna())
+            if valid_dates.empty:
+                return
 
-            if inferred_freq:
-                freq_code = str(inferred_freq).split("-")[0].upper()
-                if "D" in freq_code or "B" in freq_code:
-                    interval = max(1, total_obs // max_ticks)
-                    ax.xaxis.set_major_locator(mdates.DayLocator(interval=interval))
-                    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-                elif "M" in freq_code or "MS" in freq_code:
-                    interval = max(1, total_obs // max_ticks)
-                    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=interval))
-                    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-                elif "Q" in freq_code:
-                    interval = max(1, total_obs // max_ticks)
-                    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=interval * 3))
-                    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-Q%q"))
-                elif "A" in freq_code or "Y" in freq_code:
-                    interval = max(1, total_obs // max_ticks)
-                    ax.xaxis.set_major_locator(mdates.YearLocator(base=interval))
-                    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
-                else:
-                    # Generic datetime fallback using observation step size
-                    step = max(1, total_obs // max_ticks)
-                    tick_indices = np.arange(0, total_obs, step)
-                    ax.set_xticks(dt_index[tick_indices])
-                    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-            else:
-                # Fallback step-based sampling on true index dates
-                step = max(1, total_obs // max_ticks)
-                tick_indices = np.arange(0, total_obs, step)
-                ax.set_xticks(dt_index[tick_indices])
-                ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
+            locator = mdates.AutoDateLocator(
+                minticks=min(4, tick_limit),
+                maxticks=tick_limit,
+                interval_multiples=True,
+            )
+            formatter = mdates.ConciseDateFormatter(locator)
 
-            ax.figure.autofmt_xdate(rotation=45, ha="right")
+            # ConciseDateFormatter's defaults are deliberately compact. These
+            # formats make the hierarchy explicit while avoiding repeated years.
+            # Replace the current formats in _configure_time_axis with year/month focused formats:
+            formatter.formats = [
+                "%d %b %Y",   # days
+                "%b %Y",      # months
+                "%b %Y",      # months
+                "%Y",         # years
+                "%Y",         # years
+                "%Y", 
+            ]
 
-        # Case 2: Standard/Sequential Non-Datetime Index
-        else:
-            step = max(1, total_obs // max_ticks)
-            tick_indices = np.arange(0, total_obs, step)
-            ax.set_xticks(tick_indices)
-            ax.set_xticklabels([str(index[i]) for i in tick_indices], rotation=45, ha="right")
+            formatter.zero_formats = [
+                "%Y",
+                "%b %Y",
+                "%b %Y",
+                "%Y",
+                "%Y",
+                "%Y",
+            ]
+
+            formatter.offset_formats = [
+                "",
+                "%Y",
+                "%Y",
+                "",
+                "",
+                "",
+            ]
+
+            ax.xaxis.set_major_locator(locator)
+            ax.xaxis.set_major_formatter(formatter)
+
+            # Keep labels horizontal. ConciseDateFormatter is designed to make
+            # this readable; rotation is only introduced for dense daily axes.
+            ax.tick_params(axis="x", labelrotation=0)
+
+            span_days = (
+                valid_dates.max() - valid_dates.min()
+            ).total_seconds() / 86400.0
+
+            if span_days <= 14:
+                for label in ax.get_xticklabels():
+                    label.set_rotation(30)
+                    label.set_horizontalalignment("right")
+
+            ax.margins(x=0.01)
+            return
+
+        # Categorical / sequential fallback: ticks correspond to real
+        # observations rather than fabricated dates.
+        positions = self._select_tick_indices(len(index), tick_limit)
+        ax.set_xticks(positions)
+        ax.set_xticklabels(
+            [str(index[position]) for position in positions],
+            rotation=35,
+            ha="right",
+        )
+        ax.margins(x=0.01)
 
     def plot_seasonal(
         self,
@@ -785,7 +860,7 @@ class Visualizer:
             str: Path to saved output image file.
         """
         save_path = self._get_target_path(filename)
-        fig, ax = plt.subplots(figsize=(10, 4), dpi=self.config.dpi)
+        fig, ax = plt.subplots(figsize=self.config.default_figsize, dpi=self.config.dpi)
 
         ax.plot(
             actual.index,

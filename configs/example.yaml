@@ -1,0 +1,111 @@
+# =====================================================================
+# GLOBAL APPLICATION CONFIGURATION
+# =====================================================================
+name: "time_series_forecasting_pipeline"
+
+# =====================================================================
+# DATA INGESTION & PREPROCESSING SETTINGS
+# Maps to: DataConfig
+# =====================================================================
+data:
+  # File path to the target dataset (.csv, .xlsx, or .parquet)
+  path: "data/raw/monthly_sales.csv"
+  
+  # Row index split point for separating training and testing sets
+  split_size: 120
+  
+  # (Optional) Column name containing the datetime index. Set to null if using integer index.
+  index_col: "Date"
+  
+  # (Optional) Name of the target variable column to analyze and forecast.
+  target: "Sales"
+
+# =====================================================================
+# VISUALIZATION & GRAPHICS ENGINE SETTINGS
+# Maps to: VisualizationConfig
+# =====================================================================
+visualizer:
+  # Directory where all rendered plots will be saved
+  plot_path: "plots"
+  
+  # Type of classical seasonal decomposition ('additive' or 'multiplicative')
+  decomposition_model: "additive"
+  
+  # Matplotlib layout style theme
+  style_theme: "seaborn-v0_8-whitegrid"
+  
+  # Resolution/sharpness of saved plot images (dots per inch)
+  dpi: 150
+  
+  # Dimensions for figure rendering: [width, height] in inches.
+  # Uses PyYAML custom !tuple tag to deserialize into Python tuple(int, int)
+  default_figsize: !tuple [14, 7]
+  
+  # Maximum lag index for autocorrelation (ACF) evaluation
+  acf_lags: 40
+  
+  # Maximum number of time axis ticks displayed to prevent label overlap
+  max_time_ticks: 15
+
+# =====================================================================
+# TIME SERIES MODEL PARAMETERS
+# Maps to: ModelsConfig
+# =====================================================================
+models:
+  # -------------------------------------------------------------------
+  # Classical Decomposition Model Settings
+  # Maps to: DecomposeConfig
+  # -------------------------------------------------------------------
+  decompose:
+    # Model type: "additive" or "multiplicative"
+    model: "additive"
+    
+    # Seasonal period length (must be a positive integer)
+    period: 12
+
+  # -------------------------------------------------------------------
+  # Holt-Winters Exponential Smoothing Model Settings
+  # Maps to: ExponentialConfig
+  # -------------------------------------------------------------------
+  exponential_smoothing:
+    # Trend component type: "add", "mul", or null
+    trend: "add"
+    
+    # Seasonal component type: "add", "mul", or null
+    seasonal: "add"
+    
+    # (Optional) Length of the seasonal cycle. Set to null to infer automatically.
+    seasonal_periods: 12
+
+  # -------------------------------------------------------------------
+  # Seasonal ARIMA (SARIMA) Model Settings
+  # Maps to: SARIMAConfig
+  # -------------------------------------------------------------------
+  sarima:
+    # Non-seasonal parameters
+    p: 1  # Autoregressive (AR) order
+    d: 1  # Differencing order
+    q: 1  # Moving Average (MA) order
+    
+    # Seasonal parameters
+    P: 1  # Seasonal Autoregressive (SAR) order
+    D: 1  # Seasonal Differencing order
+    Q: 1  # Seasonal Moving Average (SMA) order
+    
+    # (Optional) Seasonal period length. Set to null to infer automatically.
+    s: 12
+
+# =====================================================================
+# EVALUATION & METRICS MATRIX
+# Maps to: ScoringConfig
+# =====================================================================
+scoring:
+  # Toggle metrics calculation (true/false)
+  mae: true   # Mean Absolute Error
+  mse: true   # Mean Squared Error
+  rmse: true  # Root Mean Squared Error
+  mape: true  # Mean Absolute Percentage Error
+  
+  # (Optional) Small numerical floor value to prevent division-by-zero during MAPE evaluation.
+  # Set to null if zero values in dataset should raise an error instead.
+  epsilon: 0.00001

@@ -1,187 +1,251 @@
-"""Production Execution Entry Point for the Time Series Forecasting Engine.
+"""Application Entry Point for Time Series Analytics Infrastructure.
 
-Handles CLI argument ingestion, environment bootstrapping, deterministic log routing,
-configuration parsing, and maps runtime control streams directly to headless batch
-orchestrators or interactive visualization interfaces.
+Provides dual operational execution models using mandatory CLI subcommands:
+1. `cli`: Headless Batch Execution Mode using a YAML configuration file.
+   Default configuration path: configs/config.py
+2. `ui`: Interactive Web Mode booting a Gradio-based interface for dynamic
+   visual exploration.
 """
 
 import argparse
-import json
 import logging
-import os
-import socket
 import sys
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-import yaml
-
-# Import corporate framework layer bluelogger.infos
+from src.app import (
+    build_gradio_interface,
+    export_report_to_pdf,
+    extract_comparative_table,
+    generate_executive_report,
+)
 from src.config import Config, get_config_from_yaml
-from src.gradio_app import build_gradio_interface
-from src.orchestrator import ExperimentOrchestrator
+from src.data import DataClass
+from src.diagnostics import calculate_stationarity, generate_stationarity_report, CombinedStationarityResult
 from src.logger import setup_logging
+from src.orchestrator import ExperimentOrchestrator
+from src.visualizer import Visualizer
 
-# Setup root-level application execution logger
-logger = logging.getLogger("forecasting_platform")
-setup_logging()
+logger: logging.Logger = logging.getLogger(__name__)
 
-# =====================================================================
-# SYSTEM BOOTSTRAPPING & LOGGING SETUP
-# =====================================================================
+DEFAULT_CONFIG_PATH: Path = Path("configs/config.py")
 
 
-# =====================================================================
-# DETERMINISTIC CONFIGURATION LOADER
-# =====================================================================
-
-
-
-
-# =====================================================================
-# NETWORKING DEFENSIVE UTILITIES
-# =====================================================================
-
-def verify_port_availability(host: str, port: int) -> bool:
-    """Checks whether the requested system port is already locked by another process.
+def run_headless_batch_pipeline(config_path: Path) -> None:
+    """Executes the automated batch analytics, modeling, and reporting pipeline.
 
     Args:
-        host: Target binding network hostname address vector (e.g., '0.0.0.0').
-        port: Numerical socket network identity port map key.
+        config_path: Path to the YAML configuration file.
 
-    Returns:
-        True if the port path can be safely bound, False if a collision is detected.
+    Raises:
+        FileNotFoundError: If the configuration file does not exist at `config_path`.
+        RuntimeError: If data ingestion or modeling pipeline execution fails.
     """
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        try:
-            sock.bind((host, port))
-            return True
-        except socket.error:
-            return False
+    if not config_path.exists():
+        logger.error("Configuration file not found: %s", config_path)
+        raise FileNotFoundError(f"Configuration file missing: {config_path}")
+
+    logger.info("Loading configuration parameters from: %s", config_path)
+    config: Optional[Config] = get_config_from_yaml(str(config_path))
+    if config is None:
+        logger.error("Failed to parse configuration file. Halting batch run.")
+        raise RuntimeError(f"Invalid YAML configuration at {config_path}")
+
+    # 1. Data Ingestion
+    dataset_path: Path = Path(config.data.path)
+    logger.info("Ingesting target dataset from: %s", dataset_path)
+    dataset: DataClass = DataClass(config=config.data)
+
+    target_col: str = config.data.target or str(dataset.data.columns[0])
+    logger.info("Executing pipeline targeting column: '%s'", target_col)
+
+    # 2. Visualizer Instantiation & Initial Graphics Engine Run
+    plot_dir: Path = Path(config.visualizer.plot_path)
+    plot_dir.mkdir(parents=True, exist_ok=True)
+
+    vis_engine: Visualizer = Visualizer(dataset=dataset, config=config.visualizer)
+    line_plot_path: str = vis_engine.plot_line_series(target_col=target_col)
+    envelope_plot_path: str = vis_engine.plot_envelope_components(
+        target_col=target_col
+    )
+    vis_engine.plot_seasonal(target_col=target_col, period=config.models.decompose.period)
+    vis_engine.plot_seasonal_decomposition(target_col=target_col, period=config.models.decompose.period)
 
 
-# =====================================================================
-# COMMAND LINE INTERFACE IMPLEMENTATION
-# =====================================================================
 
-def parse_cli_arguments(args_payload: List[str]) -> argparse.Namespace:
-    """Configures the execution schemas and parses terminal workspace flags.
 
-    Args:
-        args_payload: Parameter arguments list vector passed from systems layers.
+    # 3. Time Series Diagnostics (Stationarity & ADF Audit)
+    logger.info("Computing stationarity diagnostics...")
+    # Compute diagnostic stationarity check
+    diff_series = dataset.train[target_col].dropna().copy()
+    arima_d = config.models.sarima.d
+    arima_D = config.models.sarima.D
+    arima_s = config.models.sarima.s
+    if int(arima_d) > 0:
+        for _ in range(int(arima_d)):
+            diff_series = diff_series.diff().dropna()
+    if int(arima_D) > 0 and arima_s is not None and int(arima_s) > 0:
+        for _ in range(int(arima_D)):
+            diff_series = diff_series.diff(periods=int(arima_s)).dropna()
+    stationarity_results = calculate_stationarity(diff_series)
+    adf_summary: str = generate_stationarity_report(stationarity_results)
+
+    # 4. Model Orchestration & Benchmark Calculations
+    logger.info("Initiating model training and evaluation suite...")
+    orchestrator: ExperimentOrchestrator = ExperimentOrchestrator(
+        global_config=config
+    )
+    run_output: Dict[str, Any] = orchestrator.run_all_models(
+        target_column=target_col
+    )
+    metrics_df = extract_comparative_table(run_output)
+
+    # 5. Model Prediction Plot Generation
+    raw_results: Dict[str, Any] = run_output.get("results", {})
+    predictions: Dict[str, Any] = {
+        model_name.upper(): model_data["predictions"]
+        for model_name, model_data in raw_results.items()
+        if "predictions" in model_data
+    }
+
+    batch_plot_path: str = vis_engine.plot_predictions_vs_actuals(
+        predictions=predictions, target_col=target_col
+    )
+
+    # 6. Executive Report Synthesis & Markdown Generation
+    logger.info("Synthesizing executive evaluation report...")
+    report_md: str = generate_executive_report(
+        file_name=str(dataset_path),
+        target_col=target_col,
+        index_col=config.data.index_col or "None",
+        split_size=config.data.split_size,
+        decomp_mode=config.models.decompose.model,
+        decompose_period=config.models.decompose.period,
+        hw_trend=str(config.models.exponential_smoothing.trend),
+        hw_seasonal=str(config.models.exponential_smoothing.seasonal),
+        hw_seasonal_period=config.models.exponential_smoothing.seasonal_periods,
+        arima_p=config.models.sarima.p,
+        arima_d=config.models.sarima.d,
+        arima_q=config.models.sarima.q,
+        arima_P=config.models.sarima.P,
+        arima_D=config.models.sarima.D,
+        arima_Q=config.models.sarima.Q,
+        metrics_df=metrics_df,
+        ingestion_line_plot=line_plot_path,
+        ingestion_envelope_plot=envelope_plot_path,
+        batch_plot_output=batch_plot_path,
+        adf_summary=adf_summary,
+    )
+
+    # 7. Writing Artifacts to Disk
+    report_dir: Path = Path("reports")
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    markdown_file_path: Path = report_dir / "performance_report.md"
+    markdown_file_path.write_text(report_md, encoding="utf-8")
+    logger.info("Markdown report saved successfully to: %s", markdown_file_path)
+
+    # 8. Render PDF Export with Graceful Exception Isolation
+    pdf_file_path: Path = report_dir / "performance_report.pdf"
+    try:
+        exported_pdf: Optional[str] = export_report_to_pdf(
+            markdown_report=report_md, output_path=str(pdf_file_path)
+        )
+        if exported_pdf:
+            logger.info("PDF report saved successfully to: %s", exported_pdf)
+        else:
+            logger.warning(
+                "PDF exporter returned an empty path. Output limited to Markdown."
+            )
+    except Exception as err:
+        logger.warning(
+            "Skipping PDF compilation due to missing rendering libraries or runtime error: %s",
+            err,
+        )
+
+
+def launch_gui() -> None:
+    """Launches the interactive Gradio web application UI."""
+    logger.info("Launching Interactive Web GUI...")
+    try:
+        app_interface = build_gradio_interface()
+        app_interface.launch(
+            server_name="0.0.0.0",
+            server_port=7860,
+            share=False,
+        )
+    except Exception as err:
+        logger.critical(
+            "Failed to launch Gradio application interface: %s",
+            err,
+            exc_info=True,
+        )
+        sys.exit(1)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Constructs the command-line argument parser using subcommands.
 
     Returns:
-        A Namespace tracker recording verified processing properties.
+        argparse.ArgumentParser: Configured argument parser instance.
     """
     parser = argparse.ArgumentParser(
-        description="Production Suite Entry Point - Modular Time Series Analysis Platform",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description="Time Series Analytics & Modeling Infrastructure Entrypoint"
     )
-    
-    parser.add_argument(
+
+    subparsers = parser.add_subparsers(
+        dest="mode",
+        required=True,
+        help="Target execution mode: 'cli' for headless batch execution or 'ui' for Web GUI.",
+    )
+
+    # Subparser for CLI mode
+    cli_parser = subparsers.add_parser(
+        "cli",
+        help="Run non-interactive headless batch processing pipeline.",
+    )
+    cli_parser.add_argument(
+        "-c",
         "--config",
-        type=str,
-        default="/configs/config.yaml",
-        help="Path framework pointing toward the declarative file setup targets."
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        help=f"Path to YAML configuration file (default: {DEFAULT_CONFIG_PATH}).",
     )
-    
-    parser.add_argument(
-        "--mode",
-        type=str,
-        default="ui",
-        choices=["cli", "ui"],
-        help="Operational run strategy targeting batch analytics evaluations or presentation dashboards."
+
+    # Subparser for UI mode
+    subparsers.add_parser(
+        "ui",
+        help="Run interactive Gradio Web UI interface.",
     )
-    
-    return parser.parse_args(args_payload)
+
+    return parser
 
 
-# =====================================================================
-# MAIN ROUTING ENGINE ENTRY POINT
-# =====================================================================
+def main() -> None:
+    """Parses command-line inputs and dispatches application execution mode."""
+    setup_logging()
 
-def main(cli_args: List[str]) -> None:
-    """Coordinates core bootstrapping logic, parses arguments, and routes execution paths."""
-    # 1. Parse incoming command-line execution parameters
-    parsed_flags = parse_cli_arguments(cli_args)
-    
-    # 2. Ingest, hydrate, and validate global framework parameter models
-    global_config: Config = get_config_from_yaml(parsed_flags.config)
-    
-    logger.info("Application context fully initialized. Selected execution path mode: '%s'", parsed_flags.mode.upper())
+    parser = build_parser()
+    args = parser.parse_args()
 
-    # 4. Route traffic dynamically to processing engines or presentation layers
-    if parsed_flags.mode == "ui":
-        logger.info("Initializing Interactive Gradio Web UI Engine environment...")
-        
-        server_host = "0.0.0.0"
-        preferred_port = 7860
-        
-        # Guard against port collisions dynamically inside deployment containers
-        if not verify_port_availability(server_host, preferred_port):
-            logger.warning("Port collision identified on target %d. Scanning fallback options...", preferred_port)
-            fallback_found = False
-            for target_port in range(7861, 7880):
-                if verify_port_availability(server_host, target_port):
-                    preferred_port = target_port
-                    fallback_found = True
-                    break
-            
-            if not fallback_found:
-                logger.critical("System initialization blocked: Network interfaces locked. Unable to claim port links.")
-                logger.error("CRITICAL ERROR: Available networking sockets are full. Gradio launch halted.", file=sys.stderr)
-                sys.exit(1)
-        
-        logger.info(f"Launching Server Dashboard Instance safely bound at: http://localhost:{preferred_port}")
-        app_block = build_gradio_interface()
-        
-        # Non-blocking deployment execution server lifecycle initialization
-        app_block.launch(
-            server_name=server_host,
-            server_port=preferred_port,
-            share=False,
-            prevent_thread_lock=False
+    if args.mode == "cli":
+        logger.info(
+            "CLI mode selected. Configuration path: %s", args.config
         )
-        
-    elif parsed_flags.mode == "cli":
-        logger.info("Executing Headless Automation Batch Sequence Model Sweep...")
-        logger.info("Starting batch execution framework pipelines...")
-        
         try:
-            # Instantiate our central orchestrator facade framework layer
-            orchestrator = ExperimentOrchestrator(global_config=global_config)
-            
-            # Resolve target tracker paths
-            target_col = global_config.data.target
-            
-            # Run sequential loops benchmark hooks across models safely
-            summary_report: Dict[str, Any] = orchestrator.run_all_models(target_column=target_col)
-            
-            # 5. Process tabular evaluations and signal operational completion metrics
-            success_count = summary_report["summary"]["successful_count"]
-            failed_count = summary_report["summary"]["failed_count"]
-            total_runs = summary_report["summary"]["total_attempted"]
-            
-            logger.info(f"\n--- Batch Sweep Metrics Processing Summary ---")
-            logger.info(f"Total Processed Strategies Checked: {total_runs}")
-            logger.info(f"Successful Execution Counts:        {success_count}")
-            logger.info(f"Failed Model Implementations:       {failed_count}")
-            
-            # Check tracking constraints to determine OS process signals
-            if failed_count > 0:
-                logger.error("Headless sweep cycle closed with anomalies flagged in performance suites.")
-                logger.info("Batch sequence execution encountered validation failures on specific model matrices.", file=sys.stderr)
-                sys.exit(1)
-                
-            logger.info("Global baseline sweep finished cleanly with zero structural failure traces.")
-            logger.info("All forecasting strategies compiled successfully.")
-            sys.exit(0)
-            
-        except Exception as pipe_exc:
-            logger.critical("Catastrophic orchestration crash encountered inside CLI execution branch: %s", pipe_exc, exc_info=True)
-            logger.info(f"CRITICAL SYSTEM ERROR: Pipeline execution halted: {pipe_exc}", file=sys.stderr)
+            run_headless_batch_pipeline(config_path=args.config)
+            logger.info("Headless batch execution completed successfully.")
+        except Exception as err:
+            logger.critical(
+                "Fatal error encountered during batch execution: %s",
+                err,
+                exc_info=True,
+            )
             sys.exit(1)
+
+    elif args.mode == "ui":
+        launch_gui()
 
 
 if __name__ == "__main__":
-    # Pass environment array values to the entry point
-    main(sys.argv[1:])
+    main()
