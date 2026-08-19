@@ -16,6 +16,11 @@ Example:
   <a href="YOUR_VIDEO_URL">🎥 Demo Video</a>
 </p>
 -->
+---
+
+https://github.com/user-attachments/assets/b675196c-3e17-4d0c-8025-321c75a34a27
+
+---
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12+">
