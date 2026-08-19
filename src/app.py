@@ -406,6 +406,7 @@ def generate_executive_report(
     arima_P: int,
     arima_D: int,
     arima_Q: int,
+    arima_s: int,
     metrics_df: pd.DataFrame,
     ingestion_line_plot: Optional[str] = None,
     ingestion_envelope_plot: Optional[str] = None,
@@ -470,8 +471,7 @@ def generate_executive_report(
 | :--- | :--- |
 | **Classical Decomposition** | **Synthesis Type:** `{decomp_mode}`<br>**Seasonal Period:** `{decompose_period}` |
 | **Holt-Winters (Exponential Smoothing)** | **Trend Component:** `{hw_trend}`<br>**Seasonal Component:** `{hw_seasonal}`<br>**Seasonal Period:** `{hw_seasonal_period}` |
-| **SARIMA** | **Non-Seasonal Order $(p, d, q)$:** `({arima_p}, {arima_d}, {arima_q})`<br>**Seasonal Order $(P, D, Q)_s$:** `({arima_P}, {arima_D}, {arima_Q})_{{{hw_seasonal_period or 12}}}` |
-
+| **SARIMA** | **Non-Seasonal Order $(p, d, q)$:** `({arima_p}, {arima_d}, {arima_q})`<br>**Seasonal Order $(P, D, Q)_s$:** `({arima_P}, {arima_D}, {arima_Q})_({arima_s if 'arima_s' in locals() else 12})` |
 ---
 
 ## 4. Experimental Results & Performance Comparison
@@ -619,34 +619,43 @@ def execute_ui_pipeline(
         )
 
     try:
+        clean_index_col = None if (not index_col or index_col == "None") else index_col        
         data_cfg = DataConfig(
             path=file_obj.name,
             split_size=int(split_size),
-            index_col=index_col if index_col else None,
+            index_col=clean_index_col,
             target=target_col,
         )
         scoring_cfg = ScoringConfig(
             mae=mae_flag, mse=mse_flag, rmse=rmse_flag, mape=mape_flag, epsilon=1e-5
         )
+
+        # 2. FIX PARAMETER CASTING: Safe integer casting
+        def safe_int(val, default=12):
+            try:
+                return int(float(val))
+            except (ValueError, TypeError):
+                return default
+
         vis_cfg = VisualizationConfig(plot_path="plots/", decomposition_model=decomp_mode)
         models_cfg = ModelsConfig(
             decompose=DecomposeConfig(
                 model=decomp_mode,
-                period=int(decompose_period) if str(decompose_period).isdigit() else 12,
+                period=safe_int(decompose_period, 12),
             ),
             exponential_smoothing=ExponentialConfig(
                 trend=None if hw_trend == "None" else hw_trend,
                 seasonal=None if hw_seasonal == "None" else hw_seasonal,
-                seasonal_periods=int(hw_seasonal_period) if str(hw_seasonal_period).isdigit() else None,
+                seasonal_periods=safe_int(hw_seasonal_period, 12) if hw_seasonal != "None" else None,
             ),
             sarima=SARIMAConfig(
-                p=int(arima_p),
-                d=int(arima_d),
-                q=int(arima_q),
-                P=int(arima_P),
-                D=int(arima_D),
-                Q=int(arima_Q),
-                s=int(arima_s),
+                p=safe_int(arima_p, 1),
+                d=safe_int(arima_d, 0),
+                q=safe_int(arima_q, 1),
+                P=safe_int(arima_P, 0),
+                D=safe_int(arima_D, 0),
+                Q=safe_int(arima_Q, 0),
+                s=safe_int(arima_s, 12),
             ),
         )
         global_cfg = Config(
@@ -713,6 +722,7 @@ def execute_ui_pipeline(
             arima_P=arima_P,
             arima_D=arima_D,
             arima_Q=arima_Q,
+            arima_s=arima_s,
             metrics_df=metrics_df,
             ingestion_line_plot=line_path,
             ingestion_envelope_plot=envelope_path,

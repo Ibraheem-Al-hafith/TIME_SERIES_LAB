@@ -7,7 +7,7 @@ injection, evaluation scoring through `ScoringEngine`, and visual output generat
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Mapping, Optional, Type
+from typing import Any, Dict, Mapping, Optional, Type, Union
 
 import pandas as pd
 
@@ -49,7 +49,7 @@ class UnsupportedModelTypeError(OrchestrationError):
 # PIPELINE REGISTRY
 # =====================================================================
 
-MODEL_REGISTRY: Mapping[str, Type[BaseModel]] = {
+MODEL_REGISTRY: Mapping[str, Type[Union[DecompositionModel, ExponentialSmoothingModel, SARIMAModel]]] = {
     "decompose": DecompositionModel,
     "exponential_smoothing": ExponentialSmoothingModel,
     "sarima": SARIMAModel,
@@ -104,7 +104,7 @@ class ExperimentOrchestrator:
                 f"Available models: {list(MODEL_REGISTRY.keys())}"
             )
 
-        model_class: Type[BaseModel] = MODEL_REGISTRY[model_type]
+        model_class: Type[Union[DecompositionModel, ExponentialSmoothingModel, SARIMAModel]] = MODEL_REGISTRY[model_type]
 
         # Resolve target column identifier
         resolved_target = (
@@ -134,8 +134,12 @@ class ExperimentOrchestrator:
                 "Evaluation test split contains zero elements. Check dataset split parameters."
             )
 
-        # Instantiate model wrapper and fit via DataClass dependency injection
-        model_instance: BaseModel = model_class()
+        # Instantiate model wrapper with configuration from global_config
+        model_config = getattr(self.config.models, model_type, None)
+        if model_config is not None:
+            model_instance: BaseModel = model_class(config=model_config)
+        else:
+            model_instance: BaseModel = model_class()
 
         logger.info("Executing fit phase for model '%s' using target '%s'...", model_type, resolved_target)
         model_instance.fit(data_obj=self.data_layer, target_col=resolved_target)
@@ -146,7 +150,7 @@ class ExperimentOrchestrator:
         # Retrieve actual ground truth values directly from test split via DataClass
         actuals: pd.Series = test_df[resolved_target]
 
-        # --- FIX: Ensure predictions inherit the exact datetime index from test set ---
+        # Ensure predictions inherit the exact datetime index from test set
         predictions.index = actuals.index
 
         # Compute evaluation metrics

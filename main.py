@@ -130,6 +130,7 @@ def run_headless_batch_pipeline(config_path: Path) -> None:
         arima_P=config.models.sarima.P,
         arima_D=config.models.sarima.D,
         arima_Q=config.models.sarima.Q,
+        arima_s=config.models.sarima.s or 0,
         metrics_df=metrics_df,
         ingestion_line_plot=line_plot_path,
         ingestion_envelope_plot=envelope_plot_path,
